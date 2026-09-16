@@ -82,6 +82,8 @@ class RecordDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        from experiment_planner.ui.theme import apply_light_theme
+        apply_light_theme()
         from experiment_planner.ui.fonts import load_local_font
         load_local_font()
         self.service=None; self.task=None
