@@ -34,6 +34,8 @@ py -3.12 -m venv .venv
 .venv\Scripts\python main.py
 ```
 
+`requirements.txt` 已逐项列出全部直接运行依赖及用途（包括 `filelock`），版本约束与 `pyproject.toml` 一致；间接依赖由 pip 自动安装。末尾的 `-e .` 用于安装本项目。测试依赖另见 `requirements-dev.txt`。如果安装后仍提示 `No module named ...`，请确认终端安装依赖使用的 Python 与 PyCharm 运行配置选择的解释器一致。
+
 依赖安装需要网络或预先准备的本地 wheel。**安装完成后的实验计算、绘图、存储不需要在线服务**。不要将父目录的虚拟环境直接复制到另一台机器。
 两个版本的包名均为 `experiment-planner`，请为这个文件夹使用独立虚拟环境。
 

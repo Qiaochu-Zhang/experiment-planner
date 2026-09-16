@@ -1,2 +1,24 @@
-# Run with Python 3.12: python -m pip install -r requirements.txt
+# 使用 Python 3.12，在 python-version 目录执行：
+# python -m pip install -r requirements.txt
+# 以下显式列出全部直接运行依赖，与 pyproject.toml 保持一致。
+# 各依赖所需的间接依赖由 pip 自动安装。
+
+# 数值计算与实验数据表
+numpy>=2
+scipy>=1.13
+pandas
+
+# 实验优化与模型
+ax-platform==1.3.1
+botorch==0.18.1
+gpytorch>=1.15.2
+torch>=2.8
+
+# 桌面界面、绘图、Excel 读写与文件锁
+PySide6>=6.8,<7
+matplotlib>=3.9
+openpyxl>=3.1
+filelock>=3.16
+
+# 安装本项目，注册命令行入口及资源；这一行不是第三方包名。
 -e .
