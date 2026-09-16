@@ -1,0 +1,9 @@
+{
+  "n": 2,
+  "mode": "single",
+  "baseline_id": 1,
+  "variables": ["cl2_sccm"],
+  "model": "bayesian_linear_v1",
+  "pool_size": 64,
+  "seed": 17
+}

@@ -1,0 +1,14 @@
+{
+  "conditions": [{
+    "cl2_sccm": 20,
+    "bcl3_sccm": 10,
+    "ar_sccm": 10,
+    "pressure_mt": 5,
+    "icp_w": 300,
+    "rf_w": 30,
+    "electrode_temp_c": 20,
+    "etch_time_s": 60
+  }],
+  "model": "bayesian_linear_v1",
+  "seed": 17
+}

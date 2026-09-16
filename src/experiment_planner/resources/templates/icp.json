@@ -1,0 +1,323 @@
+{
+  "schema_version": 2,
+  "template_id": "icp_sio2_sin_etch",
+  "template_version": 1,
+  "name": "SiO2 / SiN ICP刻蚀优化",
+  "definition_source": "实验人员提供的参数范围和目标；不包含真实测量记录",
+  "parameters": [
+    {
+      "name": "cl2_sccm",
+      "label": "Cl2",
+      "value_type": "float",
+      "role": "control_input",
+      "unit": "sccm",
+      "bounds": [
+        0,
+        100
+      ],
+      "use_as_model_input": true,
+      "execution_rounding": {
+        "mode": "none",
+        "digits": null,
+        "step": null
+      },
+      "display_digits": null,
+      "note": ""
+    },
+    {
+      "name": "bcl3_sccm",
+      "label": "BCl3",
+      "value_type": "float",
+      "role": "control_input",
+      "unit": "sccm",
+      "bounds": [
+        0,
+        100
+      ],
+      "use_as_model_input": true,
+      "execution_rounding": {
+        "mode": "none",
+        "digits": null,
+        "step": null
+      },
+      "display_digits": null,
+      "note": ""
+    },
+    {
+      "name": "ar_sccm",
+      "label": "Ar",
+      "value_type": "float",
+      "role": "control_input",
+      "unit": "sccm",
+      "bounds": [
+        0,
+        100
+      ],
+      "use_as_model_input": true,
+      "execution_rounding": {
+        "mode": "none",
+        "digits": null,
+        "step": null
+      },
+      "display_digits": null,
+      "note": ""
+    },
+    {
+      "name": "icp_w",
+      "label": "ICP",
+      "value_type": "float",
+      "role": "control_input",
+      "unit": "W",
+      "bounds": [
+        100,
+        1500
+      ],
+      "use_as_model_input": true,
+      "execution_rounding": {
+        "mode": "none",
+        "digits": null,
+        "step": null
+      },
+      "display_digits": null,
+      "note": ""
+    },
+    {
+      "name": "rf_w",
+      "label": "RF",
+      "value_type": "float",
+      "role": "control_input",
+      "unit": "W",
+      "bounds": [
+        0,
+        100
+      ],
+      "use_as_model_input": true,
+      "execution_rounding": {
+        "mode": "none",
+        "digits": null,
+        "step": null
+      },
+      "display_digits": null,
+      "note": ""
+    },
+    {
+      "name": "pressure_mt",
+      "label": "腔室压力",
+      "value_type": "float",
+      "role": "control_input",
+      "unit": "mT",
+      "bounds": [
+        5,
+        50
+      ],
+      "use_as_model_input": true,
+      "execution_rounding": {
+        "mode": "none",
+        "digits": null,
+        "step": null
+      },
+      "display_digits": null,
+      "note": ""
+    },
+    {
+      "name": "electrode_temp_c",
+      "label": "电极温度",
+      "value_type": "float",
+      "role": "control_input",
+      "unit": "°C",
+      "bounds": [
+        0,
+        40
+      ],
+      "use_as_model_input": true,
+      "execution_rounding": {
+        "mode": "none",
+        "digits": null,
+        "step": null
+      },
+      "display_digits": null,
+      "note": ""
+    },
+    {
+      "name": "etch_time_s",
+      "label": "刻蚀时间",
+      "value_type": "float",
+      "role": "control_input",
+      "unit": "s",
+      "bounds": [
+        10,
+        300
+      ],
+      "use_as_model_input": true,
+      "execution_rounding": {
+        "mode": "none",
+        "digits": null,
+        "step": null
+      },
+      "display_digits": null,
+      "note": ""
+    }
+  ],
+  "measurements": [
+    {
+      "name": "sio2_initial_nm",
+      "label": "SiO2初始厚度",
+      "value_type": "float",
+      "unit": "nm",
+      "measured_at": "before",
+      "is_measurement": true,
+      "is_auxiliary_record": true,
+      "use_as_model_input": false,
+      "is_response": false,
+      "uncertainty_enabled": true,
+      "note": ""
+    },
+    {
+      "name": "sin_initial_nm",
+      "label": "SiN初始厚度",
+      "value_type": "float",
+      "unit": "nm",
+      "measured_at": "before",
+      "is_measurement": true,
+      "is_auxiliary_record": true,
+      "use_as_model_input": false,
+      "is_response": false,
+      "uncertainty_enabled": true,
+      "note": ""
+    },
+    {
+      "name": "sio2_remaining_nm",
+      "label": "SiO2剩余厚度",
+      "value_type": "float",
+      "unit": "nm",
+      "measured_at": "after",
+      "is_measurement": true,
+      "is_auxiliary_record": false,
+      "use_as_model_input": false,
+      "is_response": false,
+      "uncertainty_enabled": true,
+      "note": ""
+    },
+    {
+      "name": "sin_remaining_nm",
+      "label": "SiN剩余厚度",
+      "value_type": "float",
+      "unit": "nm",
+      "measured_at": "after",
+      "is_measurement": true,
+      "is_auxiliary_record": false,
+      "use_as_model_input": false,
+      "is_response": false,
+      "uncertainty_enabled": true,
+      "note": ""
+    }
+  ],
+  "derived_metrics": [
+    {
+      "name": "sio2_loss_nm",
+      "label": "SiO2刻蚀量",
+      "expression": "sio2_initial_nm - sio2_remaining_nm",
+      "unit": "nm",
+      "is_response": true,
+      "model_base": true,
+      "propagate_uncertainty": true
+    },
+    {
+      "name": "sin_loss_nm",
+      "label": "SiN刻蚀量",
+      "expression": "sin_initial_nm - sin_remaining_nm",
+      "unit": "nm",
+      "is_response": true,
+      "model_base": true,
+      "propagate_uncertainty": true
+    },
+    {
+      "name": "selectivity_abs",
+      "label": "刻蚀量比值绝对值",
+      "expression": "abs(sio2_loss_nm / sin_loss_nm)",
+      "unit": "1",
+      "is_response": true,
+      "model_base": false,
+      "propagate_uncertainty": true,
+      "undefined_policy": "ratio_policy"
+    }
+  ],
+  "objectives": [
+    {
+      "metric": "sio2_loss_nm",
+      "transform": "abs",
+      "direction": "maximize"
+    },
+    {
+      "metric": "sin_loss_nm",
+      "transform": "absolute_distance",
+      "target": 0,
+      "direction": "minimize"
+    },
+    {
+      "metric": "selectivity_abs",
+      "transform": "identity",
+      "direction": "maximize"
+    }
+  ],
+  "optimization": {
+    "mode": "pareto",
+    "weights": null,
+    "reference_point_policy": "versioned_and_visible",
+    "default_model_preset": "gp_rbf_v1",
+    "allowed_model_presets": [
+      "gp_rbf_v1",
+      "gp_matern25_v1",
+      "bayesian_linear_v1"
+    ]
+  },
+  "ratio_policy": {
+    "mode": "require_configuration",
+    "epsilon_nm": null,
+    "original_metric": "selectivity_abs",
+    "stable_metric_name": "selectivity_stable",
+    "keep_original_metric": true
+  },
+  "uncertainty_entry": {
+    "default_kind": "unspecified",
+    "allow_asymmetric": true,
+    "per_cell_override": true,
+    "missing_is_zero": false
+  },
+  "modeling": {
+    "base_responses": [
+      "sio2_loss_nm",
+      "sin_loss_nm"
+    ],
+    "derived_response_prediction": "joint_samples_then_transform",
+    "unspecified_cross_output_correlation": "independence_assumption_with_notice"
+  },
+  "knowledge_priors": [],
+  "context_assumptions": [
+    {
+      "field": "sio2_initial_nm",
+      "response": "sio2_loss_nm",
+      "assumption": "not_used_as_response_model_input",
+      "source": "实验人员场景假设，初始厚度仍参与刻蚀量及不确定度计算"
+    },
+    {
+      "field": "sin_initial_nm",
+      "response": "sin_loss_nm",
+      "assumption": "not_used_as_response_model_input",
+      "source": "实验人员场景假设，初始厚度仍参与刻蚀量及不确定度计算"
+    }
+  ],
+  "batch_defaults": {
+    "total_count": 6,
+    "repeat_count": 0,
+    "search_mode": "full_space",
+    "baseline_experiment_id": null,
+    "max_changed_parameters": null,
+    "changed_parameter_names": [],
+    "show_trend_plots": false
+  },
+  "input_constraints": [],
+  "outcome_constraints": [],
+  "field_note_enabled": true,
+  "condition_note_enabled": true
+}

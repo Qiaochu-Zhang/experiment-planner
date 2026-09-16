@@ -1,0 +1,2 @@
+# Run with Python 3.12: python -m pip install -r requirements.txt
+-e .
