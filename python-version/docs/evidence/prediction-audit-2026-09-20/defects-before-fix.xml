@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="11" time="5.285" timestamp="2026-09-20T09:04:25.505413+00:00" hostname="ip-172-31-18-208"><testcase classname="tests.integration.test_prediction_validity" name="test_linear_posterior_matches_independent_closed_form" time="0.717" /><testcase classname="tests.integration.test_prediction_validity" name="test_original_ratio_never_replaced_by_clipped_ratio[require_configuration]" time="0.016" /><testcase classname="tests.integration.test_prediction_validity" name="test_original_ratio_never_replaced_by_clipped_ratio[remove]" time="0.010" /><testcase classname="tests.integration.test_prediction_validity" name="test_original_ratio_never_replaced_by_clipped_ratio[stabilized]" time="0.011" /><testcase classname="tests.integration.test_prediction_validity" name="test_original_ratio_never_replaced_by_clipped_ratio[valid_region]" time="0.009"><failure message="AssertionError: &#10;Not equal to tolerance rtol=1e-07, atol=0&#10;&#10;Mismatched elements: 3 / 3 (100%)&#10;Mismatch at indices:&#10; [0]: 2.0 (ACTUAL), 2.075 (DESIRED)&#10; [1]: 2.5 (ACTUAL), 6.5 (DESIRED)&#10; [2]: 3.925 (ACTUAL), 37.74999999999999 (DESIRED)&#10;Max absolute difference among violations: 33.825&#10;Max relative difference among violations: 0.89602649&#10; ACTUAL: array([2.   , 2.5  , 3.925])&#10; DESIRED: array([ 2.075,  6.5  , 37.75 ])">template = &lt;experiment_planner.domain.template.Template object at 0x77e188588ef0&gt;
+conditions = {'cl2_sccm': 50.0, 'bcl3_sccm': 50.0, 'ar_sccm': 50.0, 'icp_w': 800.0, ...}
+mode = 'valid_region'
+
+    @pytest.mark.parametrize("mode", ["require_configuration", "remove", "stabilized", "valid_region"])
+    def test_original_ratio_never_replaced_by_clipped_ratio(template, conditions, mode):
+        template = template.revised(ratio_policy={**template.data["ratio_policy"],
+                                                  "mode": mode, "epsilon_nm": 1.0})
+        draws = [[-4.0, 0.1], [2.0, -0.2], [6.0, 2.0], [-8.0, -4.0]]
+        summary = prediction_summary(FixedSamples(draws), Encoder(template),
+                                     ["sio2_loss_nm", "sin_loss_nm"], template,
+                                     [conditions], samples=4)[0]
+        expected_raw = np.quantile([40.0, 10.0, 3.0, 2.0], [0.025, 0.5, 0.975])
+        for name in ("selectivity_abs", "raw_selectivity_abs"):
+            assert summary[name]["mean"] is None
+&gt;           np.testing.assert_allclose(summary[name]["quantiles"], expected_raw)
+E           AssertionError: 
+E           Not equal to tolerance rtol=1e-07, atol=0
+E           
+E           Mismatched elements: 3 / 3 (100%)
+E           Mismatch at indices:
+E            [0]: 2.0 (ACTUAL), 2.075 (DESIRED)
+E            [1]: 2.5 (ACTUAL), 6.5 (DESIRED)
+E            [2]: 3.925 (ACTUAL), 37.74999999999999 (DESIRED)
+E           Max absolute difference among violations: 33.825
+E           Max relative difference among violations: 0.89602649
+E            ACTUAL: array([2.   , 2.5  , 3.925])
+E            DESIRED: array([ 2.075,  6.5  , 37.75 ])
+
+tests/integration/test_prediction_validity.py:60: AssertionError</failure></testcase><testcase classname="tests.integration.test_prediction_validity" name="test_prediction_formula_converts_nm_and_um_in_both_directions" time="0.006"><failure message="assert 999.5 == 500 ± 5.0e-04&#10;  &#10;  comparison failed&#10;  Obtained: 999.5&#10;  Expected: 500 ± 5.0e-04">def test_prediction_formula_converts_nm_and_um_in_both_directions():
+        template = Template({
+            "schema_version": 2, "template_version": 1, "name": "合成单位测试",
+            "parameters": [{"name": "x", "unit": "1", "bounds": [0, 1]}],
+            "measurements": [{"name": "a", "unit": "nm", "is_response": True},
+                             {"name": "b", "unit": "um", "is_response": True}],
+            "derived_metrics": [
+                {"name": "delta", "unit": "nm", "expression": "a - b"},
+                {"name": "in_um", "unit": "um", "expression": "delta"},
+                {"name": "again_nm", "unit": "nm", "expression": "in_um"}],
+            "objectives": [{"metric": "delta", "direction": "maximize"}],
+            "optimization": {"mode": "single"}, "ratio_policy": {"mode": "remove"}})
+        summary = prediction_summary(FixedSamples([[1000, 0.5]] * 4), Encoder(template),
+                                     ["a", "b"], template, [{"x": 0.5}], samples=4)[0]
+        for name, expected in (("delta", 500), ("in_um", 0.5), ("again_nm", 500)):
+            assert template.graph.evaluate({"a": 1000, "b": 0.5})[name].value == expected
+&gt;           assert summary[name]["mean"] == pytest.approx(expected)
+E           assert 999.5 == 500 ± 5.0e-04
+E             
+E             comparison failed
+E             Obtained: 999.5
+E             Expected: 500 ± 5.0e-04
+
+tests/integration/test_prediction_validity.py:92: AssertionError</failure></testcase><testcase classname="tests.integration.test_prediction_validity" name="test_model_uses_actual_conditions_and_separate_valid_response_rows" time="0.573" /><testcase classname="tests.integration.test_prediction_validity" name="test_noise_variance_and_prediction_guards[gp_rbf_v1]" time="0.294" /><testcase classname="tests.integration.test_prediction_validity" name="test_noise_variance_and_prediction_guards[gp_matern25_v1]" time="0.233" /><testcase classname="tests.integration.test_prediction_validity" name="test_noise_variance_and_prediction_guards[bayesian_linear_v1]" time="0.210" /><testcase classname="tests.integration.test_prediction_validity" name="test_fit_linear_uses_squared_propagated_uncertainty" time="0.335" /></testsuite></testsuites>

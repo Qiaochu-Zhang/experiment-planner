@@ -1,0 +1,26 @@
+........................................................................ [ 91%]
+.......                                                                  [100%]
+=============================== warnings summary ===============================
+../.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491
+  /home/ubuntu/projects/experiment-planner/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+../.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117
+  /home/ubuntu/projects/experiment-planner/.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117: DeprecationWarning: ax.service.utils.orchestrator_options has been moved to ax.orchestration.orchestrator_options. Please update imports to use: from ax.orchestration.orchestrator_options import OrchestratorOptions, TrialType. This backward compatibility shim will be removed in a future release.
+    from ax.service.utils.orchestrator_options import OrchestratorOptions, TrialType
+
+../.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39
+  /home/ubuntu/projects/experiment-planner/.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39: DeprecationWarning: ax.service.orchestrator has been moved to ax.orchestration.orchestrator. Please update imports to use: from ax.orchestration.orchestrator import Orchestrator. This backward compatibility shim will be removed in a future release.
+    from ax.service.orchestrator import OrchestratorOptions
+
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[stabilized]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[stabilized]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[valid_region]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[valid_region]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[remove]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[remove]
+  /home/ubuntu/projects/experiment-planner/.venv/lib/python3.12/site-packages/linear_operator/utils/cholesky.py:41: NumericalWarning: A not p.d., added jitter of 1.0e-08 to the diagonal
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+79 passed, 9 warnings in 52.80s

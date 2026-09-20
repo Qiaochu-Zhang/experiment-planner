@@ -1,5 +1,7 @@
 # 实验规划助手：Python 源码版
 
+**第一次使用、没有编程基础：请先看 [Windows 新手使用教程](Windows新手使用教程.md)。** 教程按 1、2、3 等步骤说明安装 PyCharm、新建 Python 3.12 环境、复制文件、安装依赖和操作程序。
+
 使用 PyCharm 打开本文件夹，选择 **Python 3.12** 解释器，安装
 `requirements.txt` 中的依赖，然后运行 **`main.py`**。本文件夹包含独立的应用源码、
 字体、ICP 模板、测试和示例，可脱离父级仓库单独复制使用，无需 EXE 或 PyInstaller。
@@ -129,6 +131,8 @@ python cli.py history local-data/demo.sqlite
 - 不支持的模型/先验/误差组合会报出能力限制，详见 [功能对照](docs/coverage.md)。
 
 ## 验证与文件结构
+
+2026-09-20 新增预测可信度专项验证：[测试计划](实验预测测试计划.md)、[实际结果与适用边界](实验预测测试结果.md)、[全部改动记录](实验预测测试改动记录.md)。本轮包含独立留出误差与区间覆盖检查；合成验证不能替代真实机台回测。
 
 ```bash
 python -m pip install -r requirements-dev.txt

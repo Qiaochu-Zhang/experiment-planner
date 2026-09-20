@@ -1,0 +1,70 @@
+....FF.....                                                              [100%]
+=================================== FAILURES ===================================
+______ test_original_ratio_never_replaced_by_clipped_ratio[valid_region] _______
+
+template = <experiment_planner.domain.template.Template object at 0x77e188588ef0>
+conditions = {'cl2_sccm': 50.0, 'bcl3_sccm': 50.0, 'ar_sccm': 50.0, 'icp_w': 800.0, ...}
+mode = 'valid_region'
+
+    @pytest.mark.parametrize("mode", ["require_configuration", "remove", "stabilized", "valid_region"])
+    def test_original_ratio_never_replaced_by_clipped_ratio(template, conditions, mode):
+        template = template.revised(ratio_policy={**template.data["ratio_policy"],
+                                                  "mode": mode, "epsilon_nm": 1.0})
+        draws = [[-4.0, 0.1], [2.0, -0.2], [6.0, 2.0], [-8.0, -4.0]]
+        summary = prediction_summary(FixedSamples(draws), Encoder(template),
+                                     ["sio2_loss_nm", "sin_loss_nm"], template,
+                                     [conditions], samples=4)[0]
+        expected_raw = np.quantile([40.0, 10.0, 3.0, 2.0], [0.025, 0.5, 0.975])
+        for name in ("selectivity_abs", "raw_selectivity_abs"):
+            assert summary[name]["mean"] is None
+>           np.testing.assert_allclose(summary[name]["quantiles"], expected_raw)
+E           AssertionError: 
+E           Not equal to tolerance rtol=1e-07, atol=0
+E           
+E           Mismatched elements: 3 / 3 (100%)
+E           Mismatch at indices:
+E            [0]: 2.0 (ACTUAL), 2.075 (DESIRED)
+E            [1]: 2.5 (ACTUAL), 6.5 (DESIRED)
+E            [2]: 3.925 (ACTUAL), 37.74999999999999 (DESIRED)
+E           Max absolute difference among violations: 33.825
+E           Max relative difference among violations: 0.89602649
+E            ACTUAL: array([2.   , 2.5  , 3.925])
+E            DESIRED: array([ 2.075,  6.5  , 37.75 ])
+
+tests/integration/test_prediction_validity.py:60: AssertionError
+________ test_prediction_formula_converts_nm_and_um_in_both_directions _________
+
+    def test_prediction_formula_converts_nm_and_um_in_both_directions():
+        template = Template({
+            "schema_version": 2, "template_version": 1, "name": "合成单位测试",
+            "parameters": [{"name": "x", "unit": "1", "bounds": [0, 1]}],
+            "measurements": [{"name": "a", "unit": "nm", "is_response": True},
+                             {"name": "b", "unit": "um", "is_response": True}],
+            "derived_metrics": [
+                {"name": "delta", "unit": "nm", "expression": "a - b"},
+                {"name": "in_um", "unit": "um", "expression": "delta"},
+                {"name": "again_nm", "unit": "nm", "expression": "in_um"}],
+            "objectives": [{"metric": "delta", "direction": "maximize"}],
+            "optimization": {"mode": "single"}, "ratio_policy": {"mode": "remove"}})
+        summary = prediction_summary(FixedSamples([[1000, 0.5]] * 4), Encoder(template),
+                                     ["a", "b"], template, [{"x": 0.5}], samples=4)[0]
+        for name, expected in (("delta", 500), ("in_um", 0.5), ("again_nm", 500)):
+            assert template.graph.evaluate({"a": 1000, "b": 0.5})[name].value == expected
+>           assert summary[name]["mean"] == pytest.approx(expected)
+E           assert 999.5 == 500 ± 5.0e-04
+E             
+E             comparison failed
+E             Obtained: 999.5
+E             Expected: 500 ± 5.0e-04
+
+tests/integration/test_prediction_validity.py:92: AssertionError
+=============================== warnings summary ===============================
+../.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491
+  /home/ubuntu/projects/experiment-planner/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/integration/test_prediction_validity.py::test_original_ratio_never_replaced_by_clipped_ratio[valid_region]
+FAILED tests/integration/test_prediction_validity.py::test_prediction_formula_converts_nm_and_um_in_both_directions
+2 failed, 9 passed, 1 warning in 5.29s

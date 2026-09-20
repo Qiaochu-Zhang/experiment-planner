@@ -15,12 +15,14 @@ class Objectives:
         self.objectives = [o for o in template.data["objectives"] if not (o["metric"] == original and self.policy["mode"] == "remove")]
         if not self.objectives: raise ValidationError("没有参与优化的目标")
 
-    def values(self, samples):
+    def values(self, samples, *, optimization=False):
         values = {name: samples[..., i] for i, name in enumerate(self.names)}
         def visit(node):
             if isinstance(node, ast.Name):
                 if node.id not in values: raise CapabilityError(f"预测公式缺少已知基础响应：{node.id}")
-                return values[node.id]
+                value = values[node.id]
+                # Match Formula.evaluate: evaluate lengths in canonical nm.
+                return value * 1000 if formula.units[node.id] == "um" else value
             if isinstance(node, ast.Constant): return node.value
             if isinstance(node, ast.UnaryOp): return -visit(node.operand) if isinstance(node.op, ast.USub) else visit(node.operand)
             if isinstance(node, ast.BinOp):
@@ -46,16 +48,19 @@ class Objectives:
             if name in values: continue
             formula = self.template.graph.formulas[name]
             if not formula.dependencies <= values.keys(): continue
-            if name == self.policy.get("original_metric") and self.policy["mode"] in ("stabilized", "valid_region"):
+            if optimization and name == self.policy.get("original_metric") and self.policy["mode"] in ("stabilized", "valid_region"):
                 a, b = values["sio2_loss_nm"], values["sin_loss_nm"]
                 # Finite values for every sample; valid-region infeasibility is separately
                 # applied INSIDE the acquisition function, never by dropping samples.
                 values[name] = a.abs() / b.abs().clamp_min(self.policy["epsilon_nm"])
-            else: values[name] = visit(formula.root)
+            else:
+                values[name] = visit(formula.root)
+                if self.template.graph.metrics[name].get("unit") == "um":
+                    values[name] = values[name] / 1000
         return values
 
-    def transformed(self, samples, X=None):
-        values = self.values(samples)
+    def transformed(self, samples, X=None, *, optimization=True):
+        values = self.values(samples, optimization=optimization)
         result = []
         for objective in self.objectives:
             if objective["metric"] not in values: raise CapabilityError("目标无法从基础响应联合样本推导")
@@ -105,7 +110,7 @@ def prediction_summary(model, encoder, names, template, conditions, seed=0, samp
             values["raw_selectivity_abs"] = (values["sio2_loss_nm"] / values["sin_loss_nm"]).abs()
             original=objectives.policy.get("original_metric")
             if original and objectives.policy["mode"]=="stabilized":
-                values[objectives.policy.get("stable_metric_name","selectivity_stable")]=values[original]
+                values[objectives.policy.get("stable_metric_name","selectivity_stable")]=(values["sio2_loss_nm"].abs() / values["sin_loss_nm"].abs().clamp_min(objectives.policy["epsilon_nm"]))
                 values[original]=values["raw_selectivity_abs"]
         summaries = [{} for _ in conditions]
         for name, array in values.items():
@@ -121,7 +126,9 @@ def prediction_summary(model, encoder, names, template, conditions, seed=0, samp
             summary["feasibility_probability"] = feasible[:, i].double().mean().item()
             summary["samples"] = samples
             summary["seed"] = seed
-        transformed=objectives.transformed(draws)
+        # Valid-region display reports the raw, unconditional ratio quantiles.
+        # Acquisition alone uses finite off-region scores plus its constraint.
+        transformed=objectives.transformed(draws, optimization=objectives.policy["mode"] != "valid_region")
         for i,summary in enumerate(summaries):
             summary["objective_predictions"]=[]
             for j,objective in enumerate(objectives.objectives):
