@@ -23,7 +23,13 @@ def rebuild(template, records, name="local_experiment"):
     experiment = Experiment(search_space=SearchSpace(parameters), name=name, tracking_metrics=[Metric(f["name"]) for f in template.responses], is_test=True)
     rows, mapping = [], {}
     for record in records:
-        trial = experiment.new_trial().add_arm(Arm(parameters=record["actual"], name=f"experiment_{record['id']}"))
+        arm = Arm(parameters=record["actual"])
+        # Ax names unique conditions, not individual experimental runs. Leave
+        # repeated arms unnamed so Ax reuses the existing name, while each
+        # business record keeps its own trial, status and measurement rows.
+        if arm.signature not in experiment.arms_by_signature:
+            arm.name = f"experiment_{record['id']}"
+        trial = experiment.new_trial().add_arm(arm)
         mapping[str(record["id"])] = trial.index
         if record["status"] in ("completed", "partial"):
             trial.mark_running(no_runner_required=True)
