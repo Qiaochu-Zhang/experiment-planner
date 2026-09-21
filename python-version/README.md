@@ -4,6 +4,8 @@
 
 **想弄懂预测能否删除、epsilon、比值目标、变化模式、双变量和各项参数：请看 [参数与操作白话说明](参数与操作白话说明.md)。** 说明按当前代码逐项解释，并附数值例子和操作步骤。
 
+**导入历史实验记录：** 下载 [CSV 空白模板](examples/import_templates/实验记录导入模板.csv) 或 [Excel 空白模板](examples/import_templates/实验记录导入模板.xlsx)，填写方法和独立示例见 [导入模板说明](examples/import_templates/README.md)。模板含原始厚度、不确定度、误差类型和分布列。
+
 使用 PyCharm 打开本文件夹，选择 **Python 3.12** 解释器，安装
 `requirements.txt` 中的依赖，然后运行 **`main.py`**。本文件夹包含独立的应用源码、
 字体、ICP 模板、测试和示例，可脱离父级仓库单独复制使用，无需 EXE 或 PyInstaller。
