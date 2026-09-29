@@ -22,7 +22,7 @@ class Encoder:
         self.indices = {}
         width = 0
         for p in self.fields:
-            size = len(p["values"]) if p.get("value_type") == "category" else 1
+            size = len(p.get("values", [p.get("fixed_value")])) if p.get("value_type") == "category" else 1
             self.indices[p["name"]] = list(range(width, width + size))
             width += size
         self.width = width
@@ -33,7 +33,7 @@ class Encoder:
             row = []
             for p in self.fields:
                 value = condition[p["name"]]
-                if p.get("value_type") == "category": row.extend(float(value == v) for v in p["values"])
+                if p.get("value_type") == "category": row.extend(float(value == v) for v in p.get("values", [p.get("fixed_value")]))
                 elif p.get("value_type") == "bool": row.append(float(value))
                 else:
                     bounds = p.get("bounds", [min(p["values"]), max(p["values"])]) if "values" in p else p.get("bounds", [0, 1])

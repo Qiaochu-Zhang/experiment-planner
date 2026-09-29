@@ -76,6 +76,13 @@ def test_min_max_round():
     assert Formula("round(max(a,b)-min(a,b), 1)",{"a":"nm","b":"nm"}).evaluate({"a":2.25,"b":1.}) == 1.3
 
 
+def test_custom_units_are_literal_dimensions_without_implicit_conversion():
+    assert Formula('a+b', {'a':'kg','b':'kg'}).evaluate({'a':2,'b':3})==5
+    assert Formula('a/b', {'a':'rpm','b':'rpm'}).dimension=={}
+    with pytest.raises(ValidationError):Formula('a+b', {'a':'kg','b':'g'})
+    with pytest.raises(ValidationError):Formula('a', {'a':'bad\nunit'})
+
+
 def test_ratio_requires_explicit_strategy(template):
     with pytest.raises(ValidationError): template.require_ratio_configuration()
     t = template.revised(ratio_policy={**template.data["ratio_policy"],"mode":"remove"})

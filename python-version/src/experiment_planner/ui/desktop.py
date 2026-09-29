@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.template import Template
+from experiment_planner.application.template_editing import blank_template
 from experiment_planner.io.exchange import preview_import
 from experiment_planner.ui.window import MainWindow, button
 from experiment_planner.ui.template_editor import TemplateEditor
@@ -24,7 +25,7 @@ from experiment_planner.ui.messages import analysis_text
 class PythonWindow(MainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("实验规划助手 · 0.2.1 · Python 3.12 / 3.13")
+        self.setWindowTitle("实验规划助手 · 0.3.0 · Python 3.12 / 3.13")
         self.loaded_template_key = None
         self.analysis_report = None
         self.summary.setText("新建或打开本地项目，录入实验后规划下一批条件。")
@@ -79,13 +80,13 @@ class PythonWindow(MainWindow):
         template_page = QWidget()
         layout = QVBoxLayout(template_page)
         label = QLabel("编辑模板的字段、公式、目标、精度、误差与先验；保存时校验并重算派生值。\n"
-                       "更改已有项目的字段结构或范围时，请导出模板并从该模板新建项目。")
+                       "支持空白新建、复制当前模板或修改模板文件。已有记录且结构不兼容时，可直接另存模板或用新模板创建项目。")
         label.setWordWrap(True)
         layout.addWidget(label)
         actions = QHBoxLayout()
         layout.addLayout(actions)
         button("编辑项目模板", lambda: self.guard(self.edit_template), actions)
-        button("新建模板 / 从当前模板复制", lambda:self.guard(self.create_template),actions)
+        button("新建 / 复制 / 修改模板文件", lambda:self.guard(self.create_template),actions)
         button("模板导出",lambda:self.guard(self.export_template),actions)
         button("从模板新建项目",lambda:self.guard(self.create_from_template),actions)
         button("查看修订历史", lambda: self.guard(self.show_history), actions)
@@ -108,7 +109,7 @@ class PythonWindow(MainWindow):
         analysis_layout.addLayout(settings)
         self.plot_variables = QLineEdit()
         self.plot_variables.setPlaceholderText("使用下方按钮选择 1 或 2 项；空白表示只预测")
-        self.plot_metric = QLineEdit("sio2_loss_nm")
+        self.plot_metric = QLineEdit()
         settings.addRow("趋势图变量（1 或 2 项）", self.plot_variables)
         settings.addRow("趋势图响应/指标", self.plot_metric)
         choose_plot=QPushButton("选择趋势图变量 / 指标")
@@ -152,6 +153,9 @@ class PythonWindow(MainWindow):
             key=(str(project.path),template.data["template_version"])
             if key!=self.loaded_template_key:
                 self.conditions.set_template(template)
+                metrics=template.metrics or template.responses
+                if self.plot_metric.text() not in {f["name"] for f in template.fields}:
+                    self.plot_metric.setText(metrics[0]["name"] if metrics else "")
                 for index,box in enumerate(self.cross_fields):
                     box.clear()
                     for p in template.parameters:box.addItem(p.get("label",p["name"]),p["name"])
@@ -191,7 +195,19 @@ class PythonWindow(MainWindow):
         while dialog.exec():
             try:self.service.update_template(dialog.result_template)
             except ValidationError as exc:
-                QMessageBox.warning(self,"不能直接保存到已有项目",str(exc)+"\n请使用“新建模板 / 从当前模板复制”，再从该模板新建项目。");continue
+                choice=QMessageBox(self);choice.setWindowTitle("保留修改后的模板")
+                choice.setText(str(exc));choice.setInformativeText("当前修改已保留，可用它直接创建独立项目或另存模板文件。原项目数据保持原来的字段含义。")
+                new_project=choice.addButton("用此模板新建项目",QMessageBox.ButtonRole.AcceptRole)
+                save_file=choice.addButton("另存模板文件",QMessageBox.ButtonRole.ActionRole)
+                choice.addButton("返回继续编辑",QMessageBox.ButtonRole.RejectRole)
+                choice.exec()
+                if choice.clickedButton()==new_project:
+                    self.create_project(dialog.result_template)
+                    if self.service.project is not project:return
+                elif choice.clickedButton()==save_file:
+                    path,_=QFileDialog.getSaveFileName(self,"另存修改后的模板","修改后的模板.json","模板 (*.json)")
+                    if path:dialog.result_template.write(path);return
+                continue
             self.refresh();break
 
     def show_history(self):
@@ -259,14 +275,15 @@ class PythonWindow(MainWindow):
         super().cancel()
 
     def import_data(self):
-        from experiment_planner.io.exchange import read_rows
+        from experiment_planner.io.exchange import read_headers
         project=self.require_project()
         path,_=QFileDialog.getOpenFileName(self,"选择历史实验记录","","表格 (*.csv *.xlsx)")
         if not path:return
-        rows=read_rows(path)
-        headers=list(rows[0]) if rows else []
+        headers=read_headers(path)
         dialog=QDialog(self);dialog.setWindowTitle("导入列对应关系与预览");dialog.resize(1050,750)
-        layout=QVBoxLayout(dialog);layout.addWidget(QLabel("表头已一致时保留自动识别；同条件复测请为每次实验使用独立外部编号。"))
+        layout=QVBoxLayout(dialog)
+        hint=QLabel("表头一致时保留自动识别；复测使用独立外部编号。按模板输入顺序，前 30%（向上取整）全空的行视为结束，该行及后续行不导入。")
+        hint.setWordWrap(True);layout.addWidget(hint)
         mapping_table=QTableWidget(len(headers),2);mapping_table.setHorizontalHeaderLabels(["文件中的列名","对应的程序字段"]);layout.addWidget(mapping_table)
         choices=[("自动识别",None),("外部实验编号","external_id"),("实验状态","status"),("整组备注","note")]
         for f in project.template.parameters+project.template.measurements:
@@ -298,6 +315,7 @@ class PythonWindow(MainWindow):
                     lines.append("，".join(f"{labels.get(k,k)}={v}" for k,v in record["conditions"].items()))
                     lines.append("，".join(f"{labels.get(k,k)}={v.get('value')}" for k,v in record["observations"].items()))
                 output.setPlainText("\n".join(lines))
+            if preview.stop_message:output.appendPlainText("\n"+preview.stop_message)
             buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(not preview.errors)
         def commit():
             if preview is None:raise ValidationError("请先校验并预览")
@@ -332,7 +350,7 @@ class PythonWindow(MainWindow):
             "prediction":("预测与趋势图",lambda:self.go_to(3),"通过参数表单输入条件并预测"),
             "import":("导入 CSV / Excel",self.import_data,"匹配列、校验预览后保存"),
             "export":("导出实验记录",self.export_data,"导出完整精度数据"),
-            "template":("新建 / 复制模板",self.create_template,"在表单中创建并保存 JSON 模板"),
+            "template":("新建 / 复制 / 修改模板",self.create_template,"从空白、当前模板或本地文件开始"),
             "backup":("备份项目",self.backup,"备份完整数据库和历史"),
         }
         self.preferences=QSettings("ExperimentPlanner","Desktop")
@@ -363,7 +381,7 @@ class PythonWindow(MainWindow):
             b=QPushButton(title+"\n"+brief);b.setMinimumHeight(92)
             b.setStyleSheet("text-align:left;padding:16px;background:white;border:1px solid #d7e2ee;border-radius:9px;font-size:14px;")
             b.clicked.connect(lambda checked=False,f=callback:self.guard(f))
-            attach_help(b,key if key in ("precision","priors","objectives","prediction","template") else "overview")
+            attach_help(b,key if key in ("precision","priors","objectives","prediction","template","import") else "overview")
             self.favorite_grid.addWidget(b,i//3,i%3)
 
     def customize_favorites(self):
@@ -429,7 +447,22 @@ class PythonWindow(MainWindow):
         self.service.update_template(p.template.revised(batch_defaults=defaults,optimization=optimization));self.refresh()
 
     def create_template(self):
-        base=self.require_project().template if self.service else Template.builtin()
+        chooser=QDialog(self);chooser.setWindowTitle("选择模板起点");layout=QVBoxLayout(chooser)
+        layout.addWidget(QLabel("全新模板不包含任何默认工艺字段；也可复制或修改已有模板。"))
+        source=QComboBox()
+        for label,code in (("从空白创建全新模板","blank"),("复制当前项目模板","current"),("打开并修改本地模板文件","file"),("复制内置示例模板","builtin")):
+            if code!="current" or self.service:source.addItem(label,code)
+        layout.addWidget(source)
+        actions=chinese_buttons(QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel))
+        actions.accepted.connect(chooser.accept);actions.rejected.connect(chooser.reject);layout.addWidget(actions)
+        if not chooser.exec():return
+        if source.currentData()=="blank":base=blank_template()
+        elif source.currentData()=="current":base=self.require_project().template
+        elif source.currentData()=="builtin":base=Template.builtin()
+        else:
+            path,_=QFileDialog.getOpenFileName(self,"打开模板文件","","模板 (*.json)")
+            if not path:return
+            base=Template.read(path)
         dialog=TemplateEditor(base,self,creating=True)
         if not dialog.exec():return
         path,_=QFileDialog.getSaveFileName(self,"保存新模板","新模板.json","模板 (*.json)")

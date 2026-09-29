@@ -21,7 +21,7 @@ class ConditionsForm(QWidget):
             name=f["name"]
             if f.get("value_type") in ("bool","category") or "values" in f:
                 editor=QComboBox()
-                for v in f.get("values",[False,True]):editor.addItem("是" if v is True else "否" if v is False else str(v),v)
+                for v in f.get("values",[f["fixed_value"]] if "fixed_value" in f else [False,True]):editor.addItem("是" if v is True else "否" if v is False else str(v),v)
                 if name in values:editor.setCurrentIndex(max(0,editor.findData(values[name])))
             else:
                 editor=QLineEdit(str(values.get(name,f.get("fixed_value",""))))

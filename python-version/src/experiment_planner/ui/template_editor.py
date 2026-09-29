@@ -8,6 +8,8 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, 
 
 from experiment_planner.domain.template import Template
 from experiment_planner.domain.errors import ValidationError
+from experiment_planner.application.template_editing import normalize_draft
+from experiment_planner.ui.field_editor import FieldsEditor
 from experiment_planner.knowledge.priors import check_capabilities
 from experiment_planner.ui.help import attach_help, help_label, show_help
 from experiment_planner.ui.tree_editor import JsonTreeEditor, chinese_buttons
@@ -46,16 +48,17 @@ def table(headers):
 class TemplateEditor(QDialog):
     def __init__(self, template, parent=None, section="precision", creating=False):
         super().__init__(parent)
-        self.data=copy.deepcopy(template.data)
+        self.data=normalize_draft(template.data if isinstance(template, Template) else template)
         self.result_template=None
         self.creating=creating
         self.setWindowTitle("新建模板" if creating else "编辑项目模板")
         self.resize(1160,760)
         outer=QVBoxLayout(self)
-        info=QLabel("通过下列表单设置精度、先验和目标。其他配置请点“全部属性”。保存后产生新的模板版本。")
+        info=QLabel("先用“参数 / 测量 / 公式”增删字段和改名，再设置精度、先验和目标。全部配置可通过“全部属性”编辑；最后保存时统一校验。")
         info.setWordWrap(True);outer.addWidget(info)
         top=QHBoxLayout();outer.addLayout(top)
         self.name=QLineEdit(self.data.get("name","实验模板"));top.addWidget(QLabel("模板名称"));top.addWidget(self.name)
+        fields=QPushButton("参数 / 测量 / 公式（增删改名）");fields.clicked.connect(self.edit_fields);top.addWidget(fields)
         full=QPushButton("全部属性（字段 / 公式 / 范围 / 约束）");full.clicked.connect(self.edit_all);top.addWidget(full)
         help_button=QPushButton("变量与设置说明");help_button.clicked.connect(lambda:show_help("template",self));top.addWidget(help_button)
         self.tabs=QTabWidget();outer.addWidget(self.tabs)
@@ -150,6 +153,7 @@ class TemplateEditor(QDialog):
         self.epsilon.setEnabled(self.ratio.currentData() in ("valid_region","stabilized"))
         ratio_form.addRow(help_label("分母策略","ratio_policy"),self.ratio);ratio_form.addRow(help_label("分母阈值（nm）","epsilon_nm"),self.epsilon)
         newer=QPushButton("应用新版 ICP 目标：A 尽量大、B 接近零、A/B 尽量大")
+        newer.setVisible({"sio2_loss_nm","sin_loss_nm"} <= {f["name"] for f in self.data.get("derived_metrics",[])})
         newer.clicked.connect(self.new_goals);layout.addWidget(newer)
         self.tabs.addTab(page,"实验优化目标")
 
@@ -178,7 +182,7 @@ class TemplateEditor(QDialog):
         by_name={p["name"]:p for p in data["parameters"]}
         for old,mode,digits,step,origin,display in self.precision_rows:
             p=by_name[old["name"]];selected=mode.currentData()
-            p["execution_rounding"]={"mode":selected,"digits":digits.value() if selected=="digits" else None,"step":step.value() if selected=="step" else None}
+            p["execution_rounding"]={**p.get("execution_rounding",{}),"mode":selected,"digits":digits.value() if selected=="digits" else None,"step":step.value() if selected=="step" else None}
             if selected!="none":p["execution_rounding"]["origin"]=origin.value()
             p["display_digits"]=display.currentData()
         data["knowledge_priors"]=[]
@@ -215,15 +219,29 @@ class TemplateEditor(QDialog):
         dialog=JsonTreeEditor(self.collect(),self)
         while dialog.exec():
             try:
-                data=dialog.data();Template(data)
+                data=normalize_draft(dialog.data())
             except Exception as exc:QMessageBox.warning(self,"模板需要调整",user_error(exc));continue
             self.data=data;self.name.setText(data.get("name",""));self.build_pages();break
 
+    def edit_fields(self):
+        dialog=FieldsEditor(self.collect(),self)
+        if dialog.exec():
+            self.data=dialog.data;self.build_pages()
+
     def save(self):
         try:
-            data=self.collect();data["template_version"]=self.data["template_version"]+1
+            data=self.collect();data["template_version"]=1 if self.creating else self.data["template_version"]+1
             result=Template(data)
             check_capabilities(result,self.model.currentData())
+            available={f["name"] for f in result.responses}
+            if not available:raise ValidationError("至少选择一个直接建模的基础响应")
+            for name in result.graph.order:
+                if result.graph.formulas[name].dependencies <= available:available.add(name)
+            policy=result.data.get("ratio_policy",{})
+            for objective in result.data["objectives"]:
+                if policy.get("mode")=="remove" and objective["metric"]==policy.get("original_metric"):continue
+                if objective["metric"] not in available:
+                    raise ValidationError(f"目标 {objective['metric']} 无法由已选基础响应得到，请调整“直接建模”或公式依赖")
             self.result_template=result
         except Exception as exc:
             QMessageBox.warning(self,"设置未保存",user_error(exc));return

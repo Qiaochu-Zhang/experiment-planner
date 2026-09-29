@@ -9,7 +9,6 @@
 - Ubuntu / Python 3.12：核心、存储、模型、后台取消、本地图形与 Qt 测试最终全量 **65 项通过**（0 失败、0 错误，23.62 秒）。待做点多轮回归已包含。机器可读证据：[linux-validation.json](evidence/baseline-linux-validation.json)。
 - GP-RBF、GP-Matérn 2.5、贝叶斯线性真实拟合；Bernoulli-logit 概率后验；qLogNEHVI 三种分母策略已有运行证据。
 - Qt 离屏窗口完成创建项目、记录显示、关闭重开测试。无显示桌面的服务器不等同于人工交互验收。
-- Windows 构建脚本与工作流已编写；尝试建立验证分支时 GitHub API 返回 `403 Resource not accessible by integration`，本地 gh 未登录。未创建远程分支、未启动 Windows CI、未交付 Windows EXE。
 - `--self-test` 的三个模型、多轮待做、spawn 和 SQLite 备份恢复均实际通过；摘要已保存在上述证据 JSON。
 
 ## 阶段状态

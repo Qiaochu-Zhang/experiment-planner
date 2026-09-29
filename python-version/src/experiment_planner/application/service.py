@@ -106,7 +106,8 @@ class PlannerService:
         for section in ("parameters", "measurements"):
             keys = ("name", "unit", "value_type", "bounds", "values", "fixed_value")
             signature = lambda t: [{k: f.get(k) for k in keys} for f in t.data.get(section, [])]
-            if signature(old) != signature(template): raise ValidationError("字段结构、单位或范围改变需要新建项目；当前未提供结构迁移")
+            if signature(old) != signature(template) and p.experiments():
+                raise ValidationError("已有实验记录的字段结构、单位或范围不同，请将修改另存为模板或使用它新建项目")
         if template.data["template_version"] <= old.data["template_version"]:
             raise ValidationError("模板修改必须递增版本")
         recomputed = []

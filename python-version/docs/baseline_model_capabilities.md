@@ -35,4 +35,4 @@
 
 BoTorch 0.18.1 的可选 qLog C++ 扩展默认尝试运行时编译；本项目版本门控适配显式选择其自带 Python 路径，避免正式运行依赖编译器。升级版本必须重新检查适配。
 
-接口依据：[BoTorch 模型与噪声](https://botorch.org/docs/models)、[多目标采集函数](https://botorch.org/docs/multi_objective)、[Ax Modular BoTorch](https://ax.dev/docs/tutorials/modular_botorch/)。实际调用以已安装版本源码和集成测试为准。
+实际调用以已安装版本源码和集成测试为准。

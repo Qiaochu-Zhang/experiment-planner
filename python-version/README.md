@@ -1,11 +1,11 @@
-# 实验规划助手 · Python 源码版 0.2.1
+# 实验规划助手 · Python 源码版 0.3.0
 
-支持标准 **CPython 3.12、3.13**（`>=3.12,<3.14`，不含自由线程构建）。本目录可以独立复制使用，运行 `main.py` 打开中文桌面程序；计算、帮助文档和项目存储均可在依赖安装后离线使用。
+支持标准 **CPython 3.12、3.13**。运行 `main.py` 打开中文桌面程序；计算、帮助和项目存储均可在依赖安装后离线使用。软件支持自行定义实验输入、测量、公式与目标，内置模板只是可选示例。
 
-- 第一次安装：[Windows 新手教程](Windows新手使用教程.md)。
-- 界面变量、公式、探索策略的完整说明：[使用说明](src/experiment_planner/resources/help/使用说明.md)。程序中的说明按钮和蓝色悬停链接打开同一份文件。
-- 原问题及步长、说明更新、导入结束和混合误差提示的回答：[回答.md](回答.md)；[参数与操作说明](参数与操作白话说明.md)。
-- [版本改动记录](版本改动记录.md)、[验证结果](docs/validation.md)、[功能与限制](docs/coverage.md)。
+- [Windows 新手教程](Windows新手使用教程.md)
+- [通用变量与操作说明](src/experiment_planner/resources/help/使用说明.md)
+- [问题与回答](回答.md)、[参数与操作说明](参数与操作白话说明.md)
+- [版本记录](版本改动记录.md)、[验证结果](docs/validation.md)、[功能边界](docs/coverage.md)
 
 ## 安装与启动
 
@@ -14,57 +14,53 @@
 ```powershell
 py -3.13 -m venv .venv
 .venv\Scripts\python -m pip install --upgrade pip
-.venv\Scripts\python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python main.py
 ```
 
-Python 3.12 可将首行的 `3.13` 改成 `3.12`。Linux 使用 `python3.13 -m venv .venv` 和 `.venv/bin/python`。PyCharm 打开本目录，选择此解释器，以普通 Python Run 配置运行 `main.py`，不要在 Python Console 中运行整个程序；后台任务使用 spawn 子进程。
+Python 3.12 可替换首行版本号。Linux 使用 `python3.13 -m venv .venv` 和 `.venv/bin/python`。PyCharm 打开本目录，选择此解释器，以普通 Python Run 配置运行 `main.py`，不要在 Python Console 中运行整个程序。
 
-## 常用操作
+## 模板与项目
 
-1. 新建或打开 `.sqlite` 项目。常用工作台预设精度、先验、目标、录入、回填、推荐、导入 CSV / Excel、预测入口；“自定义常用功能”可增减其他按钮，重启后保留。升级时给旧常用配置补充一次导入入口，之后仍可自行取消。
-2. 录入真实实验；允许同条件、不同结果。历史数据可用 [CSV / Excel 模板](examples/import_templates/README.md)，导入先选择列对应关系并预览。
-3. “推荐工艺精度”设置每项输入的 digits 或步长；“先验关系定义”选择关系、系数、强度和来源；“实验优化目标”勾选一个或多个目标。这些操作会写入项目模板快照，无需手写 JSON。
-4. 新版默认目标：最大化 **A**、最小化 **|B|**、最大化 **A/B**。A、B 为两种初始厚度减剩余厚度，保留符号。A 和 A/B 不取绝对值。
-5. 比值推荐前明确选择分母策略。稳定化采用保留符号的分母截断，零分母使用 `+epsilon` 的明确约定；原始比值仍独立保留。
-6. “推荐下一批实验”设置总数、探索强度、专门探索名额及复测。总数 6、无复测、探索 2 时，生成 2 个专门探索点及 4 个常规评分点。数据不足时使用初始化策略并说明原因。
-7. 计算后自动保存待做记录；完成后选择对应行回填，不覆盖原来的复测来源记录。“预测与趋势图”使用条件表单和变量选择按钮。
-8. “更多功能 → 项目与模板”提供新建/复制模板、全部属性树形编辑、导出、从模板创建项目、备份和历史。字段、范围、公式、约束均可通过鼠标与键盘编辑；能力边界见说明。
-9. “查看与回填实验”支持单击、Ctrl 多选、Shift 连选和鼠标拖选，点“删除选中实验”核对后删除。删除的记录不再参与训练、推荐或普通导出，原始数据保留在审计中，旧批次预测保留；可重新导入，使用新的内部编号。当前没有一键撤销删除。
+“新建 / 复制 / 修改模板”可选择从空白开始、复制当前项目、打开本地模板文件或复制内置示例。空白草稿没有默认工艺字段。
 
-悬停帮助包含蓝色详细链接。鼠标离开变量和弹窗后约 1 秒消失；移回原变量或移入弹窗会取消关闭计时。说明文件仍为静态文件，不随项目模板自动生成。
+“参数 / 测量 / 公式（增删改名）”提供字段表单：可定义名称、类型、单位、范围/离散值/固定值、备注及公式。内部名称改动同步更新已知引用；删除会提示连带移除的公式、目标、先验及约束。“全部属性”可编辑其他属性与扩展配置。精度、先验和目标仍有专用表单。
 
-首次删除时数据库版本更新为 2，该项目需使用 0.2.1 或后续支持删除的版本打开，避免旧程序误用已删除数据；0.2.1 也支持旧数据库。完整 SQLite 备份保留删除审计；普通 CSV / Excel / JSON 导出只含未删除实验。
+至少配置一个输入、一个直接建模的响应以及有效目标后保存模板，再通过“从模板新建项目”使用它。可选单目标、多目标折中或加权目标；实验目标以当前模板为准。
 
-旧项目继续使用原来的模板快照。需要改用新版目标时，在目标表单点击“应用新版 ICP 目标”后保存；旧比值绝对值字段和旧批次仍保留。字段类型、范围、单位等结构变更当前需要新项目，界面提供完整的模板保存与新建流程。
+空项目可直接更换结构。已有实验且结构不兼容时，编辑成果可以直接另存为模板，或用它新建项目；无需从头改一遍。兼容配置可在原项目保存并更新版本。原有实验不会被套用新的字段含义，新增参数也不会自动补造数据。
 
-## 算法与接口
+## 导入与日常操作
 
-默认 GP / RBF，另支持 GP / Matérn 2.5、贝叶斯线性。每个基础响应使用全部有效完成/部分结果记录，同条件复测逐条参与拟合。512 个后验样本汇总预测；原始比值不声明有限均值或方差。预测区间为潜在响应区间。
+常用页默认有“导入 CSV / Excel”。核对列映射后，程序按**模板输入参数顺序**检查前 30%（向上取整，至少一项）：这些值全部为空时，该行为结束标记，该行及后续行不导入。例如 8 个输入检查前 3 个，11 个输入检查前 4 个。
 
-探索强度默认 0，专门探索名额默认 0。强度改变常规候选评分中的不确定性加分；专门名额按可行性、不确定性和待做条件距离选择。算法公式、128 个探索后验样本和追溯字段见 [0.2 规范](docs/v0.2_spec.md)。这两个参数不是各实验目标的加权比例。
+0 和“否”不是空值。结束前的其他错误仍需修复。预览明确显示停止行、检查字段和待导入数量，确认后点击保存。文件表头缺少用于判断的输入列时会提示映射问题。内置示例文件位于 [导入示例](examples/import_templates/README.md)；自建模板应使用自己的字段。
+
+允许同条件不同结果独立保存。实验表可单击、Ctrl 多选、Shift 连选或拖选，确认后删除所选实验。删除记录不参与当前训练、推荐和普通导出，原数据保留在审计中；旧批次不变，当前没有一键撤销。完整 SQLite 备份保留全部审计。
+
+推荐时设置总数、探索强度、专门探索名额及复测。总数包含复测；专门探索占用新条件位置，默认强度和名额都是 0。计算完成保存为待做记录，实验完成后回填对应编号。预测与趋势图的参数和响应来自当前模板。
+
+帮助文档只介绍通用软件操作，不收录具体模板的工艺参数清单。悬停简述带蓝色详细链接，离开变量与弹窗后约 1 秒关闭，移入弹窗可以继续点击。帮助为静态文件，不根据模板自动生成；字段自身说明请写在模板备注中。
+
+## 接口与验证
 
 ```bash
 python cli.py --help
-python cli.py builtin-template local-data/template.json
 python cli.py create local-data/project.sqlite --template local-data/template.json
 python cli.py template local-data/project.sqlite
 python cli.py recommend local-data/project.sqlite examples/batch.json
-python cli.py recommend local-data/project.sqlite examples/batch.json --commit
 python cli.py predict local-data/project.sqlite examples/prediction.json
 python cli.py import local-data/project.sqlite records.xlsx --commit
 python cli.py export local-data/project.sqlite records.xlsx
 python cli.py backup local-data/project.sqlite backup.sqlite
 ```
 
-命令行更新模板仍需自行增加 `template_version`；界面自动处理。CLI 的 `recommend` 默认预览，`--commit` 才写入；GUI 的“计算并保存”会写入。`BatchRequest` 可设置 `exploration_strength`、`exploration_count`、`pool_size`、`seed`；模板默认设置由桌面读取，CLI 请求应明确填写所需覆盖值。
+请求中的字段名应匹配所选模板。CLI 推荐默认预览，`--commit` 才写入；导入输出包含停止行和说明。GUI 的“计算并保存”会写入项目。
 
 ```bash
 python -m pip install -r requirements-dev.txt
-python -m pytest -q
+python -m pytest -q -p no:cacheprovider
 python main.py --self-test local-data/self-test
-python examples/workflow.py --output local-data/workflow
 ```
 
-输出目录须尚不存在。Linux 无桌面验证使用 `QT_QPA_PLATFORM=offscreen`。测试结果与适用边界见 [验证记录](docs/validation.md)，不以合成数据测试替代真实机台效果验证。
+自检输出目录须尚不存在。Linux 无桌面验证设置 `QT_QPA_PLATFORM=offscreen`。本版支持数据库版本 1 和 2；删除功能沿用版本 2 标记。能力与验证范围见上方文档，不以合成数据测试代替真实机台效果。

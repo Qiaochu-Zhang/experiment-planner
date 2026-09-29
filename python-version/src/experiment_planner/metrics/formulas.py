@@ -8,12 +8,14 @@ from experiment_planner.precision.rounding import round_decimal
 
 
 def unit_dimension(unit):
+    if not isinstance(unit, str) or len(unit) > 64 or unit.strip() != unit or any(not c.isprintable() for c in unit):
+        raise ValidationError("单位须为不超过 64 字的可打印名称，不能带首尾空白")
     units = {"1": {}, "": {}, "nm": {"length": 1}, "um": {"length": 1},
              "sccm": {"flow": 1}, "W": {"power": 1}, "mT": {"pressure": 1},
              "mTorr": {"pressure": 1}, "°C": {"temperature": 1}, "s": {"time": 1}}
-    if unit not in units:
-        raise ValidationError(f"未支持的单位：{unit}")
-    return units[unit]
+    # Custom units are opaque dimensions: identical labels are compatible, but
+    # no guessed SI conversions or compound-unit simplification is performed.
+    return units[unit] if unit in units else {f"custom:{unit}": 1}
 
 
 def combine(a, b, sign):

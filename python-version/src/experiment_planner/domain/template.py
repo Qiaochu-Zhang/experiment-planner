@@ -20,7 +20,7 @@ def parse_value(value, field):
         return mapping[key]
     if kind in ("text", "category"):
         result = str(value)
-        if kind == "category" and result not in field.get("values", []):
+        if kind == "category" and result not in field.get("values", [field["fixed_value"]] if "fixed_value" in field else []):
             raise ValidationError(f"{field['name']}：未知类别")
         return result
     if kind not in ("float", "int") or isinstance(value, bool):

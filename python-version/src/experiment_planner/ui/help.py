@@ -11,13 +11,13 @@ from shiboken6 import isValid
 
 TOPICS = {
     "overview": ("使用说明", "先创建或打开项目；录入实验后设置目标和分母策略，再推荐下一批。"),
-    "precision": ("推荐工艺精度 digits", "digits=0 表示整数，1 表示一位小数，−1 表示十位；执行精度和显示精度不同。"),
+    "precision": ("推荐工艺精度 digits", "起点为 0 时，digits=0 表示整数，1 表示一位小数；步长决定间隔，起点决定网格对齐。"),
     "priors": ("先验关系", "为某个输入和基础响应指定已有经验，选择关系、系数、强度并填写来源。"),
-    "objectives": ("实验优化目标", "可选择多个目标；新版默认最大化 SiO2 刻蚀量、SiN 接近零、最大化带符号比值。"),
+    "objectives": ("实验优化目标", "从当前模板的响应和指标中选择一个或多个目标，设置尽量大、尽量小或接近指定值。"),
     "exploration_strength": ("探索强度", "0 保留常规贝叶斯优化评分；越大，对可行且不确定的候选增加的评分越多。"),
     "exploration_count": ("专门探索名额", "从扣除复测后的新条件名额中预留探索点；例如总数 6、无复测、探索 2，另 4 个按常规评分选择。"),
     "ratio_policy": ("比值分母策略", "分母接近零时可限制有效区域、使用稳定化比值或移除比值目标。"),
-    "epsilon_nm": ("分母阈值 epsilon", "单位 nm，必须大于零；根据测量分辨率和误差选择，不是探索比例。"),
+    "epsilon_nm": ("分母阈值", "分母稳定化或有效区域的正阈值；根据当前模型的单位与测量误差设置，不是探索比例。"),
     "model": ("数值模型", "可选高斯过程 RBF、Matérn 2.5 或贝叶斯线性；单调和弱影响先验仅在线性模型中支持。"),
     "n": ("本轮实验总数", "本轮最多生成的实验记录数，包括新条件、复测和交叉布局。"),
     "mode": ("条件变化模式", "全范围不限制变化项数；单/双变量相对基准；交叉布局生成指定的单 A、单 B、AB 组合。"),
@@ -32,22 +32,11 @@ TOPICS = {
     "delete_records": ("删除实验记录", "支持鼠标单选或多选，确认后移出当前训练、推荐和导出；删除前数据保留在审计中。"),
     "favorites": ("自定义常用功能", "勾选要显示在常用工作台的功能，设置会保存在当前电脑。"),
     "prediction": ("预测与趋势图", "模型给出潜在响应分布；区间不包含未知的未来量测噪声，原始比值只报告样本分位数。"),
-    "cl2_sccm": ("Cl2 流量", "氯气流量，单位 sccm；允许范围由项目模板定义。"),
-    "bcl3_sccm": ("BCl3 流量", "三氯化硼流量，单位 sccm；是可控模型输入。"),
-    "ar_sccm": ("Ar 流量", "氩气流量，单位 sccm；是可控模型输入。"),
-    "icp_w": ("ICP 功率", "电感耦合等离子体功率，单位 W；允许值受范围和执行精度约束。"),
-    "rf_w": ("RF 功率", "射频功率，单位 W；不等同于 ICP 功率。"),
-    "pressure_mt": ("腔室压力", "反应腔压力，单位 mT；范围由模板定义。"),
-    "electrode_temp_c": ("电极温度", "电极温度，单位 °C；范围由模板定义。"),
-    "etch_time_s": ("刻蚀时间", "刻蚀持续时间，单位 s；模型将其作为工艺输入。"),
-    "sio2_initial_nm": ("SiO2 初始厚度", "实验前厚度，单位 nm；参与刻蚀量计算，默认不直接作为模型输入。"),
-    "sin_initial_nm": ("SiN 初始厚度", "实验前厚度，单位 nm；参与刻蚀量计算，默认不直接作为模型输入。"),
-    "sio2_remaining_nm": ("SiO2 剩余厚度", "实验后测量厚度，单位 nm；不能作为未来实验的已知输入。"),
-    "sin_remaining_nm": ("SiN 剩余厚度", "实验后测量厚度，单位 nm；缺失时保留为空。"),
-    "sio2_loss_nm": ("SiO2 刻蚀量 A", "初始厚度减剩余厚度，保留正负号；新版默认目标直接最大化 A。"),
-    "sin_loss_nm": ("SiN 刻蚀量 B", "初始厚度减剩余厚度，保留正负号；默认目标最小化 |B|，使其接近零。"),
-    "selectivity": ("刻蚀量比值 A/B", "新版带符号比值，不取绝对值；负比值与正比值具有不同的优化含义。"),
-    "selectivity_abs": ("旧版刻蚀量比值绝对值", "旧项目可能保留 |A/B|；打开旧项目不会自动更改目标，可在目标设置中应用新版目标。"),
+    "fields": ("输入参数与字段名称", "输入参数是实验前可以设定的条件；名称、类型、单位和取值范围由当前模板配置。"),
+    "measurements": ("原始测量", "保存实际测量值及不确定度；可选择哪些数值或是否型测量作为模型响应。"),
+    "derived_metrics": ("派生指标与公式", "通过已有字段的内部名称编写公式，计算得到新的指标；公式引用、单位和依赖关系会校验。"),
+    "import": ("导入与结束标记", "按模板输入顺序，前 30% 向上取整的输入全空时停止；该行及之后的行不导入。"),
+
 }
 
 
@@ -71,7 +60,7 @@ class HelpDialog(QDialog):
         open_file = QPushButton("打开具体说明文件")
         open_file.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(help_path()))))
         layout.addWidget(open_file)
-        self.topics.setCurrentRow(list(TOPICS).index(key) if key in TOPICS else 0)
+        self.topics.setCurrentRow(list(TOPICS).index(key) if key in TOPICS else list(TOPICS).index("fields"))
 
     def navigate(self, row):
         if row < 0: return
@@ -95,12 +84,12 @@ class HelpPopup(QFrame):
         super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setStyleSheet("QFrame {background:white;border:1px solid #b9c8dc;border-radius:7px;} QLabel {border:none;padding:6px;}")
-        title, brief = TOPICS.get(key, (key, description or "自定义模板字段；具体含义与单位见当前项目模板。"))
+        title, brief = TOPICS.get(key, (key, description or TOPICS["fields"][1]))
         layout = QVBoxLayout(self)
         label = QLabel(f"<b>{escape(title)}</b><br>{escape(description or brief)}<br><a style='color:#1565c0' href='details'>详细说明 →</a>")
         label.setWordWrap(True); label.setMaximumWidth(360)
         label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
-        label.linkActivated.connect(lambda _: (self.hide(), show_help(key, parent)))
+        label.linkActivated.connect(lambda _: (self.hide(), show_help(key if key in TOPICS else "fields", parent)))
         layout.addWidget(label)
         self.source = ref(source) if source is not None else lambda: None
         self.source_rect = source_rect

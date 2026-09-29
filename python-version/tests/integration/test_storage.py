@@ -60,7 +60,7 @@ def test_import_preview_export_dedup(service, conditions, measurements, tmp_path
 
 def test_import_error_atomic(service, tmp_path):
     path = tmp_path/"invalid.csv"
-    path.write_text("cl2_sccm\nwrong\n",encoding="utf-8")
+    path.write_text(",".join(p["name"] for p in service.project.template.parameters)+"\nwrong\n",encoding="utf-8")
     preview = preview_import(service,path)
     assert preview.errors[0]["row"] == 2
     with pytest.raises(ValidationError): preview.commit(service)

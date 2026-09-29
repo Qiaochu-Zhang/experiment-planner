@@ -45,8 +45,8 @@ def dispatch(args):
             if preview.errors:
                 raise ValueError(json.dumps(preview.errors, ensure_ascii=False))
             if args.commit:
-                return {"imported_ids": preview.commit(service)}
-            return {"preview": preview.records, "revision": preview.revision, "saved": False}
+                return {"imported_ids": preview.commit(service), "stop_row": preview.stop_row, "notice": preview.stop_message}
+            return {"preview": preview.records, "revision": preview.revision, "saved": False, "stop_row": preview.stop_row, "notice": preview.stop_message}
         if args.command == "export":
             from experiment_planner.io.exchange import export_records
             export_records(project, args.output)

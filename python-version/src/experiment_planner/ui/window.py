@@ -45,7 +45,7 @@ class RecordDialog(QDialog):
             if "bounds" in f: editor.setPlaceholderText(f"{f['bounds'][0]} – {f['bounds'][1]}")
             note = QLineEdit(self.record.get("field_notes",{}).get(name,"")); note.setPlaceholderText("参数备注")
             row = QHBoxLayout(); row.addWidget(editor); row.addWidget(note)
-            form.addRow(help_label(f"{f['label']} ({f.get('unit','1')})", name, f.get("note") or None), row)
+            form.addRow(help_label(f"{f.get('label',name)} ({f.get('unit','1')})", name, f.get("note") or None), row)
             attach_help(editor, name, f.get("note") or None)
             self.inputs[name] = editor, note
         form.addRow(QLabel("原始测量：留空表示未测；± 值必须选择含义"))
@@ -79,7 +79,7 @@ class RecordDialog(QDialog):
                 try: action()
                 except Exception as exc: QMessageBox.warning(self,"误差设置未保存",user_error(exc))
             detail.clicked.connect(safe_edit);row.addWidget(detail)
-            form.addRow(help_label(f"{f['label']} ({f.get('unit','1')})",name),row)
+            form.addRow(help_label(f"{f.get('label',name)} ({f.get('unit','1')})",name),row)
             attach_help(value,name);attach_help(amount,"uncertainty");attach_help(kind,"uncertainty")
             self.cells[name]=value,amount,kind,note,uncertainty
         self.status=QComboBox()
@@ -194,7 +194,7 @@ class MainWindow(QMainWindow):
 
     def refresh(self):
         p=self.require_project();records=p.experiments();fields=p.template.parameters+p.template.metrics
-        headers=["编号","状态",*[f"{f['label']} ({f.get('unit','1')})" for f in fields],"备注"]
+        headers=["编号","状态",*[f"{f.get('label',f['name'])} ({f.get('unit','1')})" for f in fields],"备注"]
         self.table.setColumnCount(len(headers));self.table.setHorizontalHeaderLabels(headers);self.table.setRowCount(len(records))
         for index,f in enumerate(fields,2):
             self.table.horizontalHeaderItem(index).setData(Qt.ItemDataRole.UserRole,f["name"])
@@ -265,6 +265,7 @@ class MainWindow(QMainWindow):
         if preview.errors:raise ValidationError("\n".join(f"第 {e['row']} 行：{e['message']}" for e in preview.errors[:20]))
         dialog=QDialog(self);dialog.setWindowTitle("导入预览 · 确认后写入");dialog.resize(900,600);layout=QVBoxLayout(dialog)
         content=QPlainTextEdit();content.setReadOnly(True);content.setPlainText(json.dumps(preview.records,ensure_ascii=False,indent=2));layout.addWidget(content)
+        if preview.stop_message:content.appendPlainText(preview.stop_message)
         actions=QDialogButtonBox(QDialogButtonBox.Save|QDialogButtonBox.Cancel);actions.accepted.connect(dialog.accept);actions.rejected.connect(dialog.reject);layout.addWidget(actions)
         if dialog.exec():preview.commit(self.service);self.refresh()
 

@@ -1,4 +1,21 @@
-# Python 源码版 0.2.1 验证报告
+# Python 源码版 0.3.0 验证报告
+
+本轮在 Linux x86_64、Qt offscreen 下使用合成数据验证，范围包括通用模板设计、字段增删改名、导入结束标记及原有功能回归。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| Python 3.12.3 完整回归 | **152 项通过，0 失败，退出码 0**，约 108.59 秒。[日志](evidence/v0.3.0/python312-tests.txt)、[JUnit](evidence/v0.3.0/python312-tests.xml)、[环境](evidence/v0.3.0/python312-environment.json)。 |
+| Python 3.13.15 完整回归 | **152 项通过，0 失败，退出码 0**，约 108.11 秒。[日志](evidence/v0.3.0/python313-tests.txt)、[JUnit](evidence/v0.3.0/python313-tests.xml)、[环境](evidence/v0.3.0/python313-environment.json)。 |
+| 安装包 | 0.3.0 wheel 构建，并逐文件核对全部包内源码和资源。[检查记录](evidence/v0.3.0/wheel-check.json)。 |
+| 界面 | 已查看[空白模板](evidence/v0.3.0/blank-template.png)、[字段列表](evidence/v0.3.0/fields.png)、[字段表单](evidence/v0.3.0/field-form.png)、[通用帮助](evidence/v0.3.0/general-help.png)、[导入停止预览](evidence/v0.3.0/import-end.png)。 |
+
+新增 25 项回归覆盖：CSV/XLSX 前 30% 输入全空停止，模板顺序与文件列顺序不同，1/3/4/8/10/11 个输入的向上取整规则，真实空行和格式尾行，零/否不判空，缺少表头映射和部分缺项报错；空白及本地模板编辑，输入改名后的引用同步与删除依赖，空项目换结构和有数据项目另存修改，真实录入后的模型预测，固定类别/是否输入，自定义单位与属性保留，以及无有效基础响应时的保存提示。
+
+两套回归各保留 13 条依赖弃用或数值稳定提示，原始日志中可查看。文档改为通用帮助并清理外部链接说明。源文件摘要、包内一致性与本地文档链接核对见 [总记录](evidence/v0.3.0/summary.json)。
+
+复现：在 `python-version` 使用相应环境运行 `python -m pytest -q -p no:cacheprovider`，无桌面时设置 `QT_QPA_PLATFORM=offscreen`。本地验证不代表 Windows/macOS 人工操作或真实机台收益已验收。
+
+## 0.2.1 历史验证（不覆盖本轮新增功能）
 
 日期：2026-09-29。当前版本在 Linux x86_64、Qt offscreen 下用合成数据验证。首次删除会更新数据库版本，测试同时覆盖旧项目读取和删除后的项目恢复。
 
@@ -54,7 +71,7 @@ python main.py --self-test local-data/self-test
 python examples/workflow.py --output local-data/workflow
 ```
 
-无桌面 Linux 设置 `QT_QPA_PLATFORM=offscreen`，后两项输出目录必须尚不存在。新增 GitHub Actions 对 Ubuntu/Windows 和 Python 3.12/3.13 组成矩阵；这里报告的是本地实际完成的 Linux 结果。
+无桌面 Linux 设置 `QT_QPA_PLATFORM=offscreen`，后两项输出目录必须尚不存在；这里报告的是本地实际完成的 Linux 结果。
 
 尚未在本环境完成 Windows/macOS 人工操作、PyCharm 人工点击、真实机台回测或自由线程 Python 验证。当前功能边界见 [coverage.md](coverage.md)。
 
