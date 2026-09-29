@@ -1,0 +1,45 @@
+name: Python source compatibility
+on:
+  workflow_dispatch:
+  push:
+    paths: ['python-version/**', '.github/workflows/python-source.yml']
+  pull_request:
+    paths: ['python-version/**', '.github/workflows/python-source.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.12', '3.13']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: python-version
+    env:
+      QT_QPA_PLATFORM: offscreen
+      MPLBACKEND: Agg
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install Linux Qt libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
+      - name: Install CPU PyTorch
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Install Python source project
+        run: python -m pip install -r requirements-dev.txt
+      - name: Run regression suite
+        run: python -m pytest -q --junitxml=compatibility-tests.xml
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ matrix.os }}-${{ matrix.python }}
+          path: python-version/compatibility-tests.xml

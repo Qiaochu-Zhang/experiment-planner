@@ -3,6 +3,7 @@ from dataclasses import asdict
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.template import parse_value
 from experiment_planner.metrics.uncertainty import Uncertainty, difference, propagate
+from experiment_planner.metrics.ratio import ratio_definition, stable_ratio, canonical_value
 
 
 def normalize_observations(template, observations):
@@ -38,13 +39,20 @@ def derive(template, conditions, observations):
         if u.source and u.source == v.source and u.standard() is not None and v.standard() is not None:
             covariance = u.standard() * v.standard()
         results[metric]["uncertainty"] = difference(values[initial], values[remaining], u, v, covariance)
-    if "selectivity_abs" in results and "sin_loss_nm" in results:
-        ratio, b = results["selectivity_abs"], results["sin_loss_nm"]
+    definition = ratio_definition(template)
+    if definition:
+        name, numerator, denominator, absolute = definition
+        responses = {**observations, **results}
+        ratio, a, b = results[name], responses.get(numerator, {}), responses.get(denominator, {})
         interval = (b.get("uncertainty") or {}).get("interval")
-        if b["value"] == 0 or (interval and interval[0] <= 0 <= interval[1]):
+        if denominator in uncertainties:
+            offsets = uncertainties[denominator].offsets()
+            if offsets and b.get("value") is not None:
+                interval = [b["value"] + offset for offset in offsets]
+        if b.get("value") == 0 or (interval and interval[0] <= 0 <= interval[1]):
             ratio["status"] = "unstable"
             ratio["reason"] = "分母为零或其测量区间跨零；保留有效 A、B"
         policy = template.data["ratio_policy"]
-        if policy["mode"] == "stabilized" and results.get("sio2_loss_nm", {}).get("value") is not None and b["value"] is not None:
-            results["selectivity_stable"] = {"value": abs(results["sio2_loss_nm"]["value"])/max(abs(b["value"]), policy["epsilon_nm"]), "status": "valid", "source": "stabilized_observation", "epsilon_nm": policy["epsilon_nm"], "formula_version": template.data["template_version"]}
+        if policy["mode"] == "stabilized" and a.get("value") is not None and b.get("value") is not None:
+            results[policy.get("stable_metric_name", "selectivity_stable")] = {"value": stable_ratio(canonical_value(template, numerator, a["value"]), canonical_value(template, denominator, b["value"]), policy["epsilon_nm"], absolute), "status": "valid", "source": "stabilized_observation", "epsilon_nm": policy["epsilon_nm"], "formula_version": template.data["template_version"]}
     return results

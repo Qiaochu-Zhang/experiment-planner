@@ -4,6 +4,7 @@ from botorch.acquisition.multi_objective.objective import GenericMCMultiOutputOb
 from botorch.acquisition.objective import GenericMCObjective
 
 from experiment_planner.domain.errors import CapabilityError, ValidationError
+from experiment_planner.metrics.ratio import ratio_definition, stable_ratio_tensor, canonical_value
 
 
 class Objectives:
@@ -11,6 +12,7 @@ class Objectives:
         self.template = template
         self.names = response_names
         self.policy = template.data.get("ratio_policy", {"mode": "remove"})
+        self.ratio = ratio_definition(template)
         original = self.policy.get("original_metric")
         self.objectives = [o for o in template.data["objectives"] if not (o["metric"] == original and self.policy["mode"] == "remove")]
         if not self.objectives: raise ValidationError("没有参与优化的目标")
@@ -49,10 +51,11 @@ class Objectives:
             formula = self.template.graph.formulas[name]
             if not formula.dependencies <= values.keys(): continue
             if optimization and name == self.policy.get("original_metric") and self.policy["mode"] in ("stabilized", "valid_region"):
-                a, b = values["sio2_loss_nm"], values["sin_loss_nm"]
+                _, numerator, denominator, absolute = self.ratio
+                a, b = canonical_value(self.template, numerator, values[numerator]), canonical_value(self.template, denominator, values[denominator])
                 # Finite values for every sample; valid-region infeasibility is separately
                 # applied INSIDE the acquisition function, never by dropping samples.
-                values[name] = a.abs() / b.abs().clamp_min(self.policy["epsilon_nm"])
+                values[name] = stable_ratio_tensor(a, b, self.policy["epsilon_nm"], absolute)
             else:
                 values[name] = visit(formula.root)
                 if self.template.graph.metrics[name].get("unit") == "um":
@@ -72,10 +75,11 @@ class Objectives:
 
     def constraints(self):
         result = []
-        if self.policy["mode"] == "valid_region":
-            index = self.names.index("sin_loss_nm")
+        if self.policy["mode"] == "valid_region" and self.ratio:
+            index = self.names.index(self.ratio[2])
             epsilon = self.policy["epsilon_nm"]
-            result.append(lambda samples, i=index, e=epsilon: e - samples[..., i].abs())
+            factor = canonical_value(self.template, self.ratio[2], 1)
+            result.append(lambda samples, i=index, e=epsilon, f=factor: e - (samples[..., i] * f).abs())
         for c in self.template.data.get("outcome_constraints", []):
             if c.get("op") not in ("<=", ">=") or c.get("metric") not in self.names:
                 raise CapabilityError("当前输出约束支持基础响应的 <= / >= 阈值")
@@ -106,18 +110,22 @@ def prediction_summary(model, encoder, names, template, conditions, seed=0, samp
         objectives = Objectives(template, names)
         values = objectives.values(draws)
         # Raw ratio is always a separate record with quantiles, never finite moments.
-        if "sio2_loss_nm" in values and "sin_loss_nm" in values:
-            values["raw_selectivity_abs"] = (values["sio2_loss_nm"] / values["sin_loss_nm"]).abs()
-            original=objectives.policy.get("original_metric")
+        raw_name = None
+        if objectives.ratio:
+            original, numerator, denominator, absolute = objectives.ratio
+            raw_name = "raw_selectivity_abs" if absolute else "raw_selectivity"
+            a, b = canonical_value(template, numerator, values[numerator]), canonical_value(template, denominator, values[denominator])
+            raw_ratio = a / b
+            values[raw_name] = raw_ratio.abs() if absolute else raw_ratio
             if original and objectives.policy["mode"]=="stabilized":
-                values[objectives.policy.get("stable_metric_name","selectivity_stable")]=(values["sio2_loss_nm"].abs() / values["sin_loss_nm"].abs().clamp_min(objectives.policy["epsilon_nm"]))
-                values[original]=values["raw_selectivity_abs"]
+                values[objectives.policy.get("stable_metric_name","selectivity_stable")]=stable_ratio_tensor(a, b, objectives.policy["epsilon_nm"], absolute)
+                values[original]=values[raw_name]
         summaries = [{} for _ in conditions]
         for name, array in values.items():
             for i in range(len(conditions)):
                 column = array[:, i]
                 finite = column[torch.isfinite(column)]
-                raw = name in ("raw_selectivity_abs",objectives.policy.get("original_metric"))
+                raw = name in (raw_name,objectives.policy.get("original_metric")) or template.graph.metrics.get(name, {}).get("undefined_policy") == "ratio_policy"
                 summaries[i][name] = {"mean": None if raw or len(finite) != samples else finite.mean().item(), "quantiles": torch.quantile(finite, torch.tensor([.025, .5, .975], dtype=draws.dtype)).tolist() if len(finite) else None, "interval_kind": "latent_response", "source": "joint_posterior_samples", "moment_notice": "原始比值仅报告有限样本分位数；不声明均值/方差存在" if raw else ""}
         constraints = objectives.constraints()
         feasible = torch.ones(draws.shape[:-1], dtype=torch.bool)

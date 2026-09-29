@@ -1,0 +1,10 @@
+{
+  "data": "synthetic only",
+  "stages": [
+    "gp_rbf_v1",
+    "gp_matern25_v1",
+    "bayesian_linear_v1",
+    "spawn_batch",
+    "sqlite_restore"
+  ]
+}

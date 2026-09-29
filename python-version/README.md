@@ -1,162 +1,65 @@
-# 实验规划助手：Python 源码版
+# 实验规划助手 · Python 源码版 0.2
 
-**第一次使用、没有编程基础：请先看 [Windows 新手使用教程](Windows新手使用教程.md)。** 教程按 1、2、3 等步骤说明安装 PyCharm、新建 Python 3.12 环境、复制文件、安装依赖和操作程序。
+支持标准 **CPython 3.12、3.13**（`>=3.12,<3.14`，不含自由线程构建）。本目录可以独立复制使用，运行 `main.py` 打开中文桌面程序；计算、帮助文档和项目存储均可在依赖安装后离线使用。
 
-**想弄懂预测能否删除、epsilon、比值目标、变化模式、双变量和各项参数：请看 [参数与操作白话说明](参数与操作白话说明.md)。** 说明按当前代码逐项解释，并附数值例子和操作步骤。
+- 第一次安装：[Windows 新手教程](Windows新手使用教程.md)。
+- 界面变量、公式、探索策略的完整说明：[使用说明](src/experiment_planner/resources/help/使用说明.md)。程序中的说明按钮和蓝色悬停链接打开同一份文件。
+- 原问题的新版回答：[回答.md](回答.md)；[参数与操作说明](参数与操作白话说明.md)。
+- [0.2 版本改动记录](版本改动记录.md)、[验证结果](docs/validation.md)、[功能与限制](docs/coverage.md)。
 
-**导入历史实验记录：** 下载 [CSV 空白模板](examples/import_templates/实验记录导入模板.csv) 或 [Excel 空白模板](examples/import_templates/实验记录导入模板.xlsx)，填写方法和独立示例见 [导入模板说明](examples/import_templates/README.md)。模板含原始厚度、不确定度、误差类型和分布列。
+## 安装与启动
 
-使用 PyCharm 打开本文件夹，选择 **Python 3.12** 解释器，安装
-`requirements.txt` 中的依赖，然后运行 **`main.py`**。本文件夹包含独立的应用源码、
-字体、ICP 模板、测试和示例，可脱离父级仓库单独复制使用，无需 EXE 或 PyInstaller。
-
-这是可以直接在 Python / PyCharm 中运行的完整源码工程。桌面界面使用中文，计算在本机完成。
-功能基线是 [项目说明 V1.1](docs/project_spec.md)。本版复用已有计算核心，并增加模板编辑、导入映射、交叉布局、预测与趋势图入口。
-**“完整源码”不等于全部需求已完成验收**：尚未实现的科学计算组合和界面功能列在 [功能对照与限制](docs/coverage.md)，不能把本版称为通过全部 A01–A50 的正式软件。
-
-所有 Markdown 文档均提供中文说明。中文文档目录、已完成工作和验证记录见 [开发工作记录](docs/开发工作记录.md)。命令、文件名、接口字段和软件名称保留原文，以便直接使用。
-
-## PyCharm 启动（Windows）
-
-1. 将整个 `python-version` 文件夹复制到本机，使用 PyCharm 的 **Open（打开）** 打开该文件夹。
-2. 为项目创建 **Python 3.12 的虚拟环境**。本工程的版本约束是 `>=3.12,<3.13`。
-3. 在 PyCharm 的 Terminal（终端）中确认 `python --version` 为 3.12，然后执行：
-
-   ```powershell
-   python -m pip install --upgrade pip
-   python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-   python -m pip install -r requirements.txt
-   ```
-
-4. 右键 `main.py` → **Run 'main'（运行 main）**。使用普通 Python 运行配置，不使用 Python Console（Python 控制台）执行整个脚本；后台计算使用 `multiprocessing` 的 spawn 进程启动方式。
-5. 点击「新建项目」，选择一个新 `.sqlite` 文件，即可开始录入实验。
-
-也可不用 PyCharm，从终端创建环境并运行：
+在本目录创建独立环境，不与父目录旧工程共用可编辑安装：
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.13 -m venv .venv
+.venv\Scripts\python -m pip install --upgrade pip
 .venv\Scripts\python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python main.py
 ```
 
-`requirements.txt` 已逐项列出全部直接运行依赖及用途（包括 `filelock`），版本约束与 `pyproject.toml` 一致；间接依赖由 pip 自动安装。末尾的 `-e .` 用于安装本项目。测试依赖另见 `requirements-dev.txt`。如果安装后仍提示 `No module named ...`，请确认终端安装依赖使用的 Python 与 PyCharm 运行配置选择的解释器一致。
+Python 3.12 可将首行的 `3.13` 改成 `3.12`。Linux 使用 `python3.13 -m venv .venv` 和 `.venv/bin/python`。PyCharm 打开本目录，选择此解释器，以普通 Python Run 配置运行 `main.py`，不要在 Python Console 中运行整个程序；后台任务使用 spawn 子进程。
 
-依赖安装需要网络或预先准备的本地 wheel。**安装完成后的实验计算、绘图、存储不需要在线服务**。不要将父目录的虚拟环境直接复制到另一台机器。
-两个版本的包名均为 `experiment-planner`，请为这个文件夹使用独立虚拟环境。
+## 常用操作
 
-## Linux / macOS
+1. 新建或打开 `.sqlite` 项目。常用工作台预设精度、先验、目标、录入、回填、推荐、预测入口；“自定义常用功能”可增减其他按钮，重启后保留。
+2. 录入真实实验；允许同条件、不同结果。历史数据可用 [CSV / Excel 模板](examples/import_templates/README.md)，导入先选择列对应关系并预览。
+3. “推荐工艺精度”设置每项输入的 digits 或步长；“先验关系定义”选择关系、系数、强度和来源；“实验优化目标”勾选一个或多个目标。这些操作会写入项目模板快照，无需手写 JSON。
+4. 新版默认目标：最大化 **A**、最小化 **|B|**、最大化 **A/B**。A、B 为两种初始厚度减剩余厚度，保留符号。A 和 A/B 不取绝对值。
+5. 比值推荐前明确选择分母策略。稳定化采用保留符号的分母截断，零分母使用 `+epsilon` 的明确约定；原始比值仍独立保留。
+6. “推荐下一批实验”设置总数、探索强度、专门探索名额及复测。总数 6、无复测、探索 2 时，生成 2 个专门探索点及 4 个常规评分点。数据不足时使用初始化策略并说明原因。
+7. 计算后自动保存待做记录；完成后选择对应行回填，不覆盖原来的复测来源记录。“预测与趋势图”使用条件表单和变量选择按钮。
+8. “更多功能 → 项目与模板”提供新建/复制模板、全部属性树形编辑、导出、从模板创建项目、备份和历史。字段、范围、公式、约束均可通过鼠标与键盘编辑；能力边界见说明。
 
-```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python main.py
-```
+旧项目继续使用原来的模板快照。需要改用新版目标时，在目标表单点击“应用新版 ICP 目标”后保存；旧比值绝对值字段和旧批次仍保留。字段类型、范围、单位等结构变更当前需要新项目，界面提供完整的模板保存与新建流程。
 
-Linux CPU 环境可先用上面的 PyTorch CPU 源安装 `torch`。Qt 图形窗口需要桌面显示环境及系统图形库；Ubuntu 缺少相关库时可安装 `libgl1`、`libegl1`、`libxcb-cursor0`、`libxkbcommon-x11-0`。无桌面的服务器可以运行命令行与离屏测试。macOS、Windows 的完整人工操作尚未在本次环境验证。
+## 算法与接口
 
-## 一次完整练习
+默认 GP / RBF，另支持 GP / Matérn 2.5、贝叶斯线性。每个基础响应使用全部有效完成/部分结果记录，同条件复测逐条参与拟合。512 个后验样本汇总预测；原始比值不声明有限均值或方差。预测区间为潜在响应区间。
 
-在工程目录执行，以下文件必须使用尚不存在的新路径：
-
-```bash
-python main.py --demo local-data/demo.sqlite
-python main.py --project local-data/demo.sqlite
-```
-
-1. 示例有 12 条明确标识的合成记录，不代表真实机台物理规律。
-2. 「下一批实验」先选择并保存分母策略；使用有效区域或稳定化策略时必须填写正数 epsilon，单位 nm。
-3. 选择 GP-RBF、GP-Matérn 2.5 或贝叶斯线性模型，设置本轮总数 `n`、基准、变化模式和复测编号。
-4. 单变量每点改变一项；双变量可选择最多/恰好两项；交叉布局输入两个变量的新值，例如 `{"cl2_sccm":20,"rf_w":30}`。基准复测、单 A、单 B、AB 都计入 `n`。
-5. 生成结果自动保存为待做记录。选择实验行并「更正选中实验 / 回填」，填写实际条件和测量结果。原建议与旧预测保留。
-6. 「预测 / 趋势图」从选中实验复制条件，可以修改数值；留空图变量只做预测，填写一/两项数值变量则保存 PNG 并显示图形。使用「下一批实验」选择的模型。
-7. 「模板 / 公式 / 先验」通过 JSON 编辑配置。保存自动递增版本、校验公式与角色，并重算派生值。结构/范围变更需要从导出的新模板创建新项目。
-8. 导入 CSV/XLSX 可配置表头映射，先校验和预览再保存。导出保留完整精度；迁移项目使用「一致性备份」，再在另一环境打开备份数据库。
-
-无需操作界面的完整代码示例：
-
-```bash
-python examples/workflow.py --output local-data/workflow
-```
-
-该脚本完成建项目、合成测量录入、拟合、推荐、回填、预测、绘图、CSV/XLSX/JSON 导出及 SQLite 备份恢复。输出目录必须尚不存在。
-
-## Python 和命令行接口
-
-`src/experiment_planner/` 是完整业务源码；入口不依赖父目录代码。
-可从 Python 导入 `Project`、`PlannerService`、`BatchRequest`、`generate`、`analyze`。
-可执行示例见 [workflow.py](examples/workflow.py)。
+探索强度默认 0，专门探索名额默认 0。强度改变常规候选评分中的不确定性加分；专门名额按可行性、不确定性和待做条件距离选择。算法公式、128 个探索后验样本和追溯字段见 [0.2 规范](docs/v0.2_spec.md)。这两个参数不是各实验目标的加权比例。
 
 ```bash
 python cli.py --help
-python cli.py records local-data/demo.sqlite
 python cli.py builtin-template local-data/template.json
-python cli.py template local-data/demo.sqlite --input local-data/template.json
-python cli.py recommend local-data/demo.sqlite examples/batch.json
-python cli.py recommend local-data/demo.sqlite examples/batch.json --commit
-python cli.py predict local-data/demo.sqlite examples/prediction.json
-python cli.py export local-data/demo.sqlite local-data/records.xlsx
-python cli.py backup local-data/demo.sqlite local-data/backup.sqlite
-python cli.py history local-data/demo.sqlite
+python cli.py create local-data/project.sqlite --template local-data/template.json
+python cli.py template local-data/project.sqlite
+python cli.py recommend local-data/project.sqlite examples/batch.json
+python cli.py recommend local-data/project.sqlite examples/batch.json --commit
+python cli.py predict local-data/project.sqlite examples/prediction.json
+python cli.py import local-data/project.sqlite records.xlsx --commit
+python cli.py export local-data/project.sqlite records.xlsx
+python cli.py backup local-data/project.sqlite backup.sqlite
 ```
 
-模板更新前要编辑 `template_version` 为大于当前版本的整数；刚导出的内置模板版本为 1，不能不加修改地覆盖已有版本。
-`recommend` 默认只返回预览，`--commit` 才保存待做批次；含比值推荐前仍须明确保存分母策略。
-
-`record` 命令的 JSON 格式：
-
-```json
-{
-  "conditions": {"cl2_sccm":20,"bcl3_sccm":10,"ar_sccm":10,"icp_w":300,"rf_w":30,"pressure_mt":5,"electrode_temp_c":20,"etch_time_s":60},
-  "observations": {
-    "sio2_initial_nm":{"value":100,"uncertainty":{"kind":"std","amount":1}},
-    "sio2_remaining_nm":{"value":90,"uncertainty":{"kind":"std","amount":1}},
-    "sin_initial_nm":100,
-    "sin_remaining_nm":99
-  },
-  "status":"completed",
-  "note":"实验备注",
-  "field_notes":{"cl2_sccm":"参数备注"}
-}
-```
-
-执行 `python cli.py record 项目.sqlite record.json` 新增；加 `--id 1` 更正/回填编号 1。更正 JSON 必须包含想保留的完整测量和备注。
-导入预览为 `python cli.py import 项目.sqlite 数据.xlsx`，加 `--mapping mapping.json` 指定映射，加 `--commit` 提交。映射格式为 `{"原表头":"模板字段名"}`。
-`predict` 请求可额外带 `plot_path`、`variables`、`metric`、`points`（2–30），详见示例脚本。
-
-## 计算口径
-
-- `A = SiO2 初始厚度 − 剩余厚度`，`B = SiN 初始厚度 − 剩余厚度`，均保留符号。
-- 默认 Pareto 目标为最大化 `abs(A)`、最小化 `abs(B)`、最大化 `abs(A/B)`。
-- 原始比值和稳定化指标分别保留；原始比值后验只报告样本分位数，不声明均值/方差存在。
-- 显示取整不改变原始数据；缺失、零、False、失败、比值无效互相区分。
-- 测量 ± 值须注明标准不确定度、SEM、误差界限等含义；未知误差不视为零。
-- 模型区间表示潜在响应，不自动包含未来量测误差。数据不足时输出初始化条件，不伪造预测。
-- 不支持的模型/先验/误差组合会报出能力限制，详见 [功能对照](docs/coverage.md)。
-
-## 验证与文件结构
-
-2026-09-20 新增预测可信度专项验证：[测试计划](实验预测测试计划.md)、[实际结果与适用边界](实验预测测试结果.md)、[全部改动记录](实验预测测试改动记录.md)。本轮包含独立留出误差与区间覆盖检查；合成验证不能替代真实机台回测。
+命令行更新模板仍需自行增加 `template_version`；界面自动处理。CLI 的 `recommend` 默认预览，`--commit` 才写入；GUI 的“计算并保存”会写入。`BatchRequest` 可设置 `exploration_strength`、`exploration_count`、`pool_size`、`seed`；模板默认设置由桌面读取，CLI 请求应明确填写所需覆盖值。
 
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
 python main.py --self-test local-data/self-test
+python examples/workflow.py --output local-data/workflow
 ```
 
-Linux 服务器 GUI 冒烟检查：`QT_QPA_PLATFORM=offscreen python main.py --smoke`。
-`--self-test` 输出目录必须尚不存在，会检查三个数值模型、后台进程和备份恢复。
-本次验证记录见 [validation.md](docs/validation.md)。
-
-```text
-main.py                 PyCharm / GUI 启动入口
-cli.py                  命令行入口
-pyproject.toml          Python 3.12、依赖与包配置
-requirements*.txt       应用与测试依赖安装入口
-src/experiment_planner/ 完整业务、模型、数据库、界面代码和字体/模板
-examples/               完整工作流和 JSON 请求
-tests/                  核心、模型、存储、后台、GUI 与独立运行测试
-docs/                   原项目说明、需求对照与验证说明
-```
-
-源码与资源均随文件夹提供；Python 解释器和第三方依赖不在其中。离线部署时，在相同系统/架构、Python 3.12 的联网机器上先准备依赖 wheel，再通过 `pip install --no-index --find-links wheelhouse .` 安装；wheelhouse 还需包含构建依赖 setuptools。实际离线安装必须在目标机器验证。
+输出目录须尚不存在。Linux 无桌面验证使用 `QT_QPA_PLATFORM=offscreen`。测试结果与适用边界见 [验证记录](docs/validation.md)，不以合成数据测试替代真实机台效果验证。

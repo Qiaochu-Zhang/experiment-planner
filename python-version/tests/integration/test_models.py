@@ -30,11 +30,12 @@ def test_real_model_fit_and_joint_prediction(service,preset):
     assert (samples[:,0,:]-samples[:,1,:]).abs().max() < .01
     assert samples.std(0).min() > 0
     summary = prediction_summary(model,encoder,names,service.project.template,conditions)
-    assert summary[0]["raw_selectivity_abs"]["mean"] is None
+    assert summary[0]["raw_selectivity"]["mean"] is None
     assert summary[0]["sio2_loss_nm"]["mean"] is not None
 
 
-def test_nonlinear_shared_samples(template):
+def test_nonlinear_shared_samples(legacy_template):
+    template = legacy_template
     template = template.revised(ratio_policy={**template.data["ratio_policy"],"mode":"stabilized","epsilon_nm":1})
     objective = Objectives(template,["sio2_loss_nm","sin_loss_nm"])
     sample = torch.tensor([[[-2.,.5]], [[4.,-2.]]],dtype=torch.double)

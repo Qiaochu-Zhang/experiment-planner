@@ -1,0 +1,6 @@
+{
+  "wheel": "experiment_planner-0.2.0-py3-none-any.whl",
+  "sha256": "3611e9e49b54381941947fe7bfec436056bdc96a927efcb232af2cc34f38772a",
+  "all_package_source_and_resources_match": true,
+  "requires_python": ">=3.12,<3.14"
+}

@@ -22,6 +22,8 @@ class BatchRequest:
     seed: int = 0
     pool_size: int = 128
     show_trend_plots: bool = False
+    exploration_strength: float = 0.0
+    exploration_count: int = 0
 
     def validate(self, template):
         if type(self.n) is not int or not 1 <= self.n <= 100: raise ValidationError("本轮总数必须为 1–100")
@@ -34,6 +36,12 @@ class BatchRequest:
             if self.baseline is None: raise ValidationError("此模式需要完整基准条件")
             template.validate_conditions(self.baseline)
         if len(self.repeat_ids) > self.n: raise ValidationError("复测占用总配额，不能超过 n")
+        if type(self.exploration_strength) not in (int, float) or not math.isfinite(self.exploration_strength) or not 0 <= self.exploration_strength <= 100:
+            raise ValidationError("探索强度必须是 0–100 的有限数值；0 保留常规贝叶斯优化评分")
+        if type(self.exploration_count) is not int or not 0 <= self.exploration_count <= self.n - len(self.repeat_ids):
+            raise ValidationError("专门探索名额必须为非负整数，且不能超过扣除复测后的新条件名额")
+        if self.mode == "cross" and self.exploration_count:
+            raise ValidationError("交叉布局的条件已经指定，不能同时设置专门探索名额")
         if self.mode == "cross":
             if len(self.cross_values) != 2 or set(self.cross_values) - names: raise ValidationError("交叉布局需要两项变化值")
             if any(self.baseline[k] == v for k, v in self.cross_values.items()): raise ValidationError("交叉布局的新值不能与基准相同")

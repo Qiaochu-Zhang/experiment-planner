@@ -1,3 +1,5 @@
+> 0.2 更新：本导入格式继续适用，支持 Python 3.12 / 3.13。导入界面改为下拉选择列对应关系；相同条件的不同次实验使用不同 external_id。新版默认优化 A 和 A/B 原值，SiN 仍接近零；原始四项厚度列不变。参见 [使用说明](../../src/experiment_planner/resources/help/使用说明.md)。
+
 # CSV / Excel 实验记录导入模板
 
 适用：Python 源码版的内置 **SiO2 / SiN ICP** 项目。核对日期：2026-09-21。

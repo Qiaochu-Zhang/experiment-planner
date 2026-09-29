@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "template_id": "icp_sio2_sin_etch",
-  "template_version": 1,
+  "template_version": 2,
   "name": "SiO2 / SiN ICP刻蚀优化",
   "definition_source": "实验人员提供的参数范围和目标；不包含真实测量记录",
   "parameters": [
@@ -232,9 +232,9 @@
       "propagate_uncertainty": true
     },
     {
-      "name": "selectivity_abs",
-      "label": "刻蚀量比值绝对值",
-      "expression": "abs(sio2_loss_nm / sin_loss_nm)",
+      "name": "selectivity",
+      "label": "刻蚀量比值",
+      "expression": "sio2_loss_nm / sin_loss_nm",
       "unit": "1",
       "is_response": true,
       "model_base": false,
@@ -245,7 +245,7 @@
   "objectives": [
     {
       "metric": "sio2_loss_nm",
-      "transform": "abs",
+      "transform": "identity",
       "direction": "maximize"
     },
     {
@@ -255,7 +255,7 @@
       "direction": "minimize"
     },
     {
-      "metric": "selectivity_abs",
+      "metric": "selectivity",
       "transform": "identity",
       "direction": "maximize"
     }
@@ -274,7 +274,7 @@
   "ratio_policy": {
     "mode": "require_configuration",
     "epsilon_nm": null,
-    "original_metric": "selectivity_abs",
+    "original_metric": "selectivity",
     "stable_metric_name": "selectivity_stable",
     "keep_original_metric": true
   },
@@ -314,7 +314,11 @@
     "baseline_experiment_id": null,
     "max_changed_parameters": null,
     "changed_parameter_names": [],
-    "show_trend_plots": false
+    "show_trend_plots": false,
+    "exploration_strength": 0.0,
+    "exploration_count": 0,
+    "pool_size": 128,
+    "seed": 0
   },
   "input_constraints": [],
   "outcome_constraints": [],

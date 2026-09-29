@@ -1,0 +1,22 @@
+{
+  "test_command": "python -m pytest -q -p no:cacheprovider tests/gui",
+  "reason": "Qt 退出期对象生命周期修复后重复验证",
+  "python312": {
+    "runs": 3,
+    "passed_per_run": 6,
+    "exit_codes": [
+      0,
+      0,
+      0
+    ]
+  },
+  "python313": {
+    "runs": 3,
+    "passed_per_run": 6,
+    "exit_codes": [
+      0,
+      0,
+      0
+    ]
+  }
+}

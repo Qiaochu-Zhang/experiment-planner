@@ -47,7 +47,8 @@ def test_linear_posterior_matches_independent_closed_form():
 
 
 @pytest.mark.parametrize("mode", ["require_configuration", "remove", "stabilized", "valid_region"])
-def test_original_ratio_never_replaced_by_clipped_ratio(template, conditions, mode):
+def test_original_ratio_never_replaced_by_clipped_ratio(legacy_template, conditions, mode):
+    template = legacy_template
     template = template.revised(ratio_policy={**template.data["ratio_policy"],
                                               "mode": mode, "epsilon_nm": 1.0})
     draws = [[-4.0, 0.1], [2.0, -0.2], [6.0, 2.0], [-8.0, -4.0]]

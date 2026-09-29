@@ -99,7 +99,10 @@ def test_extended_desktop_requests_and_cleanup(service):
         window.copy_conditions()
         assert json.loads(window.conditions.toPlainText()) == service.project.experiment(1)["actual"]
         window.mode.setCurrentIndex(window.mode.findData("cross"))
-        window.cross_values.setText('{"cl2_sccm": 20, "rf_w": 30}')
+        window.cross_fields[0].setCurrentIndex(window.cross_fields[0].findData("cl2_sccm"))
+        window.cross_fields[1].setCurrentIndex(window.cross_fields[1].findData("rf_w"))
+        window.cross_inputs[0].setText("20")
+        window.cross_inputs[1].setText("30")
         window.baseline.setCurrentIndex(window.baseline.findData(1))
         request = window.batch_request()
         assert request.cross_values == {"cl2_sccm": 20, "rf_w": 30}

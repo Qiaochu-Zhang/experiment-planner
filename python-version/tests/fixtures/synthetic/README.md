@@ -1,3 +1,5 @@
+> 0.2：合成用例增加带符号目标、探索强度和名额、旧模板兼容及可视化配置检查；合成数据不代表真实机台。
+
 # 合成测试数据
 
 所有测试由 `experiment_planner.application.synthetic.synthetic_records` 或测试自身生成。

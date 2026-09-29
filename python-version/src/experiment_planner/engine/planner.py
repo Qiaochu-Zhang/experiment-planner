@@ -13,6 +13,7 @@ from experiment_planner.engine.models import fit_models
 from experiment_planner.engine.objectives import Objectives, prediction_summary
 from experiment_planner.engine.space import BatchRequest, candidate_pool, changes, key
 from experiment_planner.knowledge.priors import check_capabilities
+from experiment_planner.engine.exploration import candidate_statistics, adjusted_scores, dedicated_scores
 
 
 def generate(snapshot, request):
@@ -29,6 +30,7 @@ def generate(snapshot, request):
     check_capabilities(template, request.model)
     ax_experiment, ax_mapping = rebuild(template, records, snapshot["name"])
     candidates = []
+    exploration_info = {"algorithm": "uncertainty_bonus_v1", "posterior_samples": 128, "objective_scales": None}
     for rid in request.repeat_ids:
         if rid not in by_id or by_id[rid]["status"] not in ("completed", "partial"):
             raise ValidationError("复测只能选择已有有效实验")
@@ -88,18 +90,39 @@ def generate(snapshot, request):
             elif config["mode"] in ("single", "weighted"):
                 acquisition = qLogNoisyExpectedImprovement(model=model, X_baseline=baseline, sampler=sampler, objective=objectives.botorch_objective(), constraints=objectives.constraints() or None, X_pending=pending, cache_root=False)
             else: raise ValidationError("未知优化模式")
+            remaining_exploration = request.exploration_count
+            if pool and (request.exploration_strength or remaining_exploration):
+                scales = transformed.flatten(0, 1).std(0).clamp_min(1e-8)
+                exploration_info["objective_scales"] = scales.tolist()
+                uncertainty, feasibility = candidate_statistics(model, encoder.encode(pool), objectives, scales, request.seed)
+            else:
+                uncertainty = torch.zeros(len(pool), dtype=torch.double)
+                feasibility = torch.ones(len(pool), dtype=torch.double)
             while pool and len(candidates) < request.n:
                 X = encoder.encode(pool)
                 scores = torch.cat([acquisition(chunk.unsqueeze(-2)).reshape(-1) for chunk in X.split(16)])
                 if not torch.isfinite(scores).all(): raise CapabilityError("采集函数返回非有限评分，未保存批次")
-                chosen = int(scores.argmax())
+                if remaining_exploration:
+                    selection_scores = dedicated_scores(X, uncertainty, feasibility, encoder.encode(pending_conditions) if pending_conditions else None)
+                    arrangement = "exploration"
+                    remaining_exploration -= 1
+                else:
+                    selection_scores = adjusted_scores(scores, uncertainty, feasibility, request.exploration_strength)
+                    arrangement = "new"
+                chosen = int(selection_scores.argmax())
                 condition = pool.pop(chosen)
-                candidates.append({"conditions": condition, "arrangement": "new", "log_acquisition": scores[chosen].item()})
+                candidates.append({"conditions": condition, "arrangement": arrangement, "log_acquisition": scores[chosen].item(), "selection_score": selection_scores[chosen].item(), "normalized_uncertainty": uncertainty[chosen].item(), "selection_feasibility": feasibility[chosen].item()})
+                mask = torch.arange(len(uncertainty)) != chosen
+                uncertainty, feasibility = uncertainty[mask], feasibility[mask]
                 pending_conditions.append(condition)
                 acquisition.set_X_pending(encoder.encode(pending_conditions))
+            if request.exploration_strength or request.exploration_count:
+                notices.append(f"探索强度 {request.exploration_strength:g}；专门探索要求 {request.exploration_count} 个，实际生成 {sum(c['arrangement'] == 'exploration' for c in candidates)} 个；评分使用标准化目标不确定性、可行概率，专门探索额外考虑与待做条件的距离")
     else:
-        for condition in pool[:max(0, request.n-len(candidates))]:
-            candidates.append({"conditions": condition, "arrangement": "initialization"})
+        for i, condition in enumerate(pool[:max(0, request.n-len(candidates))]):
+            candidates.append({"conditions": condition, "arrangement": "exploration" if i < request.exploration_count else "initialization"})
+        if request.exploration_count:
+            notices.append("数据不足，专门探索名额使用初始化候选；其余新条件也处于初始化阶段，尚未执行模型优化")
     if fitted and candidates:
         predictions = prediction_summary(*fitted, template, [c["conditions"] for c in candidates], seed=request.seed)
     else: predictions = [None] * len(candidates)
@@ -112,4 +135,5 @@ def generate(snapshot, request):
     if len(candidates) < request.n:
         shortfall = "完整交叉布局已返回；其余配额未自动追加实验" if request.mode == "cross" else "当前合法候选池不足（含冻结、网格、约束与历史去重）；未放宽条件；有限采样不证明全空间无解"
     if request.show_trend_plots: notices.append("本批次保存趋势图请求；当前原型需通过独立分析接口生成切片，尚未自动生成批次图")
-    return {"revision": snapshot["revision"], "template_version": template.data["template_version"], "request": asdict(request), "stage": stage, "candidates": candidates, "shortfall": shortfall, "notices": notices, "reference_point": reference, "model_datasets": datasets, "ax_snapshot": ax_snapshot(ax_experiment, ax_mapping), "versions": {p: importlib.metadata.version(p) for p in ("ax-platform", "botorch", "torch")}}
+    exploration_info["actual_count"] = sum(c["arrangement"] == "exploration" for c in candidates)
+    return {"revision": snapshot["revision"], "template_version": template.data["template_version"], "request": asdict(request), "stage": stage, "candidates": candidates, "shortfall": shortfall, "notices": notices, "reference_point": reference, "exploration": exploration_info, "model_datasets": datasets, "ax_snapshot": ax_snapshot(ax_experiment, ax_mapping), "versions": {p: importlib.metadata.version(p) for p in ("ax-platform", "botorch", "torch")}}

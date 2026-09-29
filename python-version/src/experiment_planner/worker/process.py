@@ -1,6 +1,6 @@
 """Spawn worker: calculate on an immutable snapshot, commit only in parent."""
 import multiprocessing as mp
-import traceback
+import warnings
 from filelock import FileLock, Timeout
 
 from experiment_planner.domain.errors import ValidationError
@@ -8,15 +8,21 @@ from experiment_planner.domain.errors import ValidationError
 
 def _run(connection, snapshot, request, operation):
     try:
-        if operation == "analyze":
-            from experiment_planner.application.analysis import analyze
-            result = analyze(snapshot, request)
-        else:
-            from experiment_planner.engine.planner import generate
-            result = generate(snapshot, request)
+        with warnings.catch_warnings(record=True) as captured:
+            warnings.simplefilter("always")
+            if operation == "analyze":
+                from experiment_planner.application.analysis import analyze
+                result = analyze(snapshot, request)
+            else:
+                from experiment_planner.engine.planner import generate
+                result = generate(snapshot, request)
+        from experiment_planner.ui.messages import warning_text
+        result.setdefault("notices", []).extend(dict.fromkeys(warning_text(w) for w in captured))
+        result["diagnostics"] = list(dict.fromkeys(f"{w.category.__name__}: {w.message}" for w in captured))
         connection.send({"result": result})
     except Exception as exc:
-        connection.send({"error": f"{type(exc).__name__}: {exc}"})
+        from experiment_planner.ui.messages import user_error
+        connection.send({"error": user_error(exc), "diagnostic": f"{type(exc).__name__}: {exc}"})
     finally: connection.close()
 
 

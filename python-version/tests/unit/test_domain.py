@@ -42,13 +42,13 @@ def test_formulas(template, measurements):
     result = template.graph.evaluate(measurements)
     assert result["sio2_loss_nm"].value == 10
     assert result["sin_loss_nm"].value == 1
-    assert result["selectivity_abs"].value == 10
+    assert result["selectivity"].value == 10
     measurements["sio2_remaining_nm"] = 110
     measurements["sin_remaining_nm"] = 100
     result = template.graph.evaluate(measurements)
     assert result["sio2_loss_nm"].value == -10
-    assert result["selectivity_abs"].value is None
-    assert result["selectivity_abs"].status == "undefined"
+    assert result["selectivity"].value is None
+    assert result["selectivity"].status == "undefined"
 
 
 def test_missing_keeps_other_response(template):
@@ -69,7 +69,7 @@ def test_display_does_not_modify_ratio(template, measurements):
     measurements["sin_remaining_nm"] = 99.999
     result = template.graph.evaluate(measurements)
     assert display(result["sin_loss_nm"].value, 1) == "0.0"
-    assert result["selectivity_abs"].value == pytest.approx(10000)
+    assert result["selectivity"].value == pytest.approx(10000)
 
 
 def test_min_max_round():

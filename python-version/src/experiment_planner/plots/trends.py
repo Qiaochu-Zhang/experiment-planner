@@ -2,6 +2,8 @@
 from dataclasses import asdict
 import numpy as np
 from matplotlib.figure import Figure
+from matplotlib.font_manager import FontProperties
+from importlib.resources import files
 
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.engine.objectives import prediction_summary
@@ -34,19 +36,22 @@ def plot_slice(model,encoder,names,template,baseline,variables,metric,path,revis
     if metric not in predictions[0]:raise ValidationError("该响应无法预测；剩余厚度预测需要初始条件及专门误差传播")
     figure=Figure(figsize=(9,6),layout="constrained");ax=figure.subplots()
     quantiles=np.array([p[metric]["quantiles"] for p in predictions],dtype=float)
-    labels={p["name"]:f"{p['name']} ({p.get('unit','1')})" for p in template.parameters}
+    font=FontProperties(fname=str(files("experiment_planner").joinpath("resources/fonts/NotoSansCJK-Regular.ttc")))
+    labels={p["name"]:f"{p.get('label',p['name'])} ({p.get('unit','1')})" for p in template.fields}
+    metric_label=labels.get(metric,metric)
     if len(variables)==1:
         x=[c[variables[0]] for c in conditions]
-        ax.plot(x,quantiles[:,1],label="Posterior median")
-        ax.fill_between(x,quantiles[:,0],quantiles[:,2],alpha=.25,label="95% latent-response interval")
-        ax.axvline(baseline[variables[0]],ls="--",color="gray",label="Baseline input")
-        ax.set_ylabel(metric);ax.legend()
+        ax.plot(x,quantiles[:,1],label="后验中位数")
+        ax.fill_between(x,quantiles[:,0],quantiles[:,2],alpha=.25,label="潜在响应中央 95% 区间")
+        ax.axvline(baseline[variables[0]],ls="--",color="gray",label="基准输入")
+        ax.set_ylabel(metric_label,fontproperties=font);ax.legend(prop=font)
     else:
         x=[c[variables[0]] for c in conditions];y=[c[variables[1]] for c in conditions]
-        scatter=ax.scatter(x,y,c=quantiles[:,1],cmap="viridis");figure.colorbar(scatter,ax=ax,label=f"{metric}: posterior median")
-        ax.scatter([baseline[variables[0]]],[baseline[variables[1]]],marker="x",color="red",label="Baseline");ax.legend();ax.set_ylabel(labels[variables[1]])
-    ax.set_xlabel(labels[variables[0]])
+        scatter=ax.scatter(x,y,c=quantiles[:,1],cmap="viridis");colorbar=figure.colorbar(scatter,ax=ax);colorbar.set_label(f"{metric_label}：后验中位数",fontproperties=font)
+        ax.scatter([baseline[variables[0]]],[baseline[variables[1]]],marker="x",color="red",label="基准");ax.legend(prop=font);ax.set_ylabel(labels[variables[1]],fontproperties=font)
+    ax.set_xlabel(labels[variables[0]],fontproperties=font)
     fixed={k:v for k,v in baseline.items() if k not in variables}
-    figure.suptitle(f"Synthetic/development model slice | data revision {revision}\nFixed: {fixed}",fontsize=9)
+    fixed_text="，".join(f"{labels.get(k,k)}={v:g}" if isinstance(v,(int,float)) else f"{labels.get(k,k)}={v}" for k,v in fixed.items())
+    figure.suptitle(f"模型预测切片 | 数据版本 {revision}\n固定条件：{fixed_text}",fontsize=9,fontproperties=font)
     figure.savefig(path,dpi=140)
     return {"revision":revision,"template_version":template.data["template_version"],"conditions":conditions,"predictions":predictions,"fixed":fixed,"interval_kind":"latent_response","seed":seed}

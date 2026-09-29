@@ -39,7 +39,7 @@ def test_versioned_formula_recompute(service, conditions, measurements):
     metrics[0] = {**metrics[0],"expression":"sio2_remaining_nm - sio2_initial_nm"}
     service.update_template(p.template.revised(derived_metrics=metrics))
     assert p.experiments()[0]["derived"]["sio2_loss_nm"]["value"] == -10
-    assert p.template.data["template_version"] == 2
+    assert p.template.data["template_version"] == 3
 
 
 @pytest.mark.parametrize("extension",["csv","xlsx"])
@@ -78,9 +78,9 @@ def test_multiple_connections_see_new_template(service,conditions,measurements):
         reader=PlannerService(second)
         new=p.template.revised(ratio_policy={**p.template.data["ratio_policy"],"mode":"remove"})
         service.update_template(new)
-        assert second.template.data["template_version"]==2
+        assert second.template.data["template_version"]==3
         eid=reader.add_record(conditions,measurements)
-        assert p.experiment(eid)["template_version"]==2
+        assert p.experiment(eid)["template_version"]==3
 
 
 def test_stale_import_and_conflicting_external_id(service,conditions,measurements):

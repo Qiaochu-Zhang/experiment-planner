@@ -1,4 +1,4 @@
-# 使用 Python 3.12，在 python-version 目录执行：
+# 使用标准 CPython 3.12 或 3.13，在 python-version 目录执行：
 # python -m pip install -r requirements.txt
 # 以下显式列出全部直接运行依赖，与 pyproject.toml 保持一致。
 # 各依赖所需的间接依赖由 pip 自动安装。
@@ -15,7 +15,7 @@ gpytorch>=1.15.2
 torch>=2.8
 
 # 桌面界面、绘图、Excel 读写与文件锁
-PySide6>=6.8,<7
+PySide6>=6.8.1,<7
 matplotlib>=3.9
 openpyxl>=3.1
 filelock>=3.16

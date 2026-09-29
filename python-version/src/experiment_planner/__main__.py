@@ -25,7 +25,7 @@ def main():
         print(f"合成案例已保存：{args.demo}；分母策略仍需显式配置。")
         return
     from PySide6.QtWidgets import QApplication
-    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import QTimer, QCoreApplication, QEvent
     from experiment_planner.ui.desktop import PythonWindow
     app=QApplication([]);app.setApplicationName("ExperimentPlanner")
     window=PythonWindow()
@@ -34,7 +34,12 @@ def main():
         window.set_project(Project(args.project))
     window.show()
     if args.smoke:QTimer.singleShot(500,window.close);QTimer.singleShot(600,app.quit)
-    return app.exec()
+    result=app.exec()
+    # Destroy widgets while QApplication and its translator are still alive.
+    # Python wrappers may otherwise release Qt resources during interpreter exit.
+    for widget in app.topLevelWidgets():widget.deleteLater()
+    QCoreApplication.sendPostedEvents(None,QEvent.Type.DeferredDelete)
+    return result
 
 
 if __name__ == "__main__":raise SystemExit(main())

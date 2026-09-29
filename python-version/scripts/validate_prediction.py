@@ -70,10 +70,10 @@ def metrics(actual, predicted, intervals, baseline):
 
 def summarize(points):
     result = {}
-    for name in RESPONSES + ["raw_selectivity_abs", "selectivity_stable"]:
+    for name in RESPONSES + ["raw_selectivity", "selectivity_stable"]:
         actual = [p["truth"][name] for p in points]
         # 原始比值无均值，用中位数评估；其他指标沿用应用显示均值。
-        predicted = [p["prediction"][name]["quantiles"][1] if name == "raw_selectivity_abs"
+        predicted = [p["prediction"][name]["quantiles"][1] if name == "raw_selectivity"
                      else p["prediction"][name]["mean"] for p in points]
         result[name] = metrics(actual, predicted,
                                [p["prediction"][name]["quantiles"] for p in points],
@@ -125,8 +125,8 @@ def run(output):
                 observed_y = np.array([[e["derived"][n]["value"] for n in RESPONSES]
                                        for e in snapshot["experiments"]])
                 baseline = dict(zip(RESPONSES, observed_y.mean(0).tolist()))
-                baseline["raw_selectivity_abs"] = float(np.median(np.abs(observed_y[:, 0]/observed_y[:, 1])))
-                baseline["selectivity_stable"] = float(np.mean(np.abs(observed_y[:, 0])/np.maximum(np.abs(observed_y[:, 1]), 1)))
+                baseline["raw_selectivity"] = float(np.median(observed_y[:, 0]/observed_y[:, 1]))
+                baseline["selectivity_stable"] = float(np.mean(observed_y[:, 0] / (np.where(observed_y[:, 1] < 0, -1, 1) * np.maximum(np.abs(observed_y[:, 1]), 1))))
                 for preset in PRESETS:
                     print(f"{scenario} seed={seed} {preset}", flush=True)
                     with warnings.catch_warnings(record=True) as caught:
@@ -139,8 +139,8 @@ def run(output):
                             for c, (a, b), prediction in zip(test_c, test_y, result["predictions"]):
                                 assert prediction["samples"] == 512
                                 truths = dict(zip(RESPONSES, [float(a), float(b)]))
-                                truths.update(raw_selectivity_abs=float(abs(a/b)),
-                                              selectivity_stable=float(abs(a)/max(abs(b), 1)))
+                                truths.update(raw_selectivity=float(a/b),
+                                              selectivity_stable=float(a / ((-1 if b < 0 else 1) * max(abs(b), 1))))
                                 points.append({"conditions": c, "truth": truths, "baseline": baseline,
                                                "prediction": {n: prediction[n] for n in truths}})
                             run_result = {"scenario": scenario, "seed": seed, "model": preset,

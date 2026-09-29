@@ -1,10 +1,18 @@
 """Keep the light desktop interface readable under dark system themes."""
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QLibraryInfo, QTranslator, QLocale
 
 
 def apply_light_theme():
     app = QApplication.instance()
+    QLocale.setDefault(QLocale("zh_CN"))
+    if not hasattr(app,"chinese_translator"):
+        # Python owns this translator through the app attribute; giving it the
+        # same C++ parent can cause double destruction during interpreter exit.
+        translator=QTranslator()
+        translator.load("qt_zh_CN",QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))
+        app.installTranslator(translator);app.chinese_translator=translator
     # Fusion uses the supplied palette consistently across desktop platforms.
     app.setStyle("Fusion")
     palette = QPalette()

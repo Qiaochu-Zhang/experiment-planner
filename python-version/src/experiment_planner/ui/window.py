@@ -14,6 +14,9 @@ from experiment_planner.domain.errors import ValidationError
 from experiment_planner.io.exchange import preview_import, export_records
 from experiment_planner.storage.project import Project
 from experiment_planner.precision.rounding import display
+from experiment_planner.ui.help import attach_help, help_label, HelpFilter
+from experiment_planner.ui.messages import user_error, batch_text
+from experiment_planner.ui.tree_editor import chinese_buttons, JsonTreeEditor
 
 
 def button(text, callback, layout):
@@ -30,6 +33,7 @@ class RecordDialog(QDialog):
         self.resize(860,700)
         self.inputs, self.cells = {}, {}
         self.record = record or {}
+        self.template = template
         outer = QVBoxLayout(self)
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
         content = QWidget(); form = QFormLayout(content)
@@ -41,7 +45,8 @@ class RecordDialog(QDialog):
             if "bounds" in f: editor.setPlaceholderText(f"{f['bounds'][0]} – {f['bounds'][1]}")
             note = QLineEdit(self.record.get("field_notes",{}).get(name,"")); note.setPlaceholderText("参数备注")
             row = QHBoxLayout(); row.addWidget(editor); row.addWidget(note)
-            form.addRow(f"{f['label']} ({f.get('unit','1')})", row)
+            form.addRow(help_label(f"{f['label']} ({f.get('unit','1')})", name, f.get("note") or None), row)
+            attach_help(editor, name, f.get("note") or None)
             self.inputs[name] = editor, note
         form.addRow(QLabel("原始测量：留空表示未测；± 值必须选择含义"))
         for f in template.measurements:
@@ -60,7 +65,22 @@ class RecordDialog(QDialog):
             note=QLineEdit(cell.get("note",""));note.setPlaceholderText("测量备注")
             row=QHBoxLayout()
             for widget in (value,amount,kind,note): row.addWidget(widget)
-            form.addRow(f"{f['label']} ({f.get('unit','1')})",row)
+            detail=QPushButton("详细误差")
+            def edit_uncertainty(checked=False, u=uncertainty, a=amount, k=kind):
+                data={"distribution":None,"coverage_factor":None,"confidence":None,"lower":None,"upper":None,"source":None,**u,"kind":k.currentData(),"amount":float(a.text()) if a.text().strip() else None}
+                dialog=JsonTreeEditor(data,self,"测量误差 · 逐项设置")
+                if dialog.exec():
+                    from experiment_planner.metrics.uncertainty import Uncertainty
+                    updated=dialog.data();Uncertainty(**updated)
+                    u.clear();u.update(updated)
+                    if k.findData(u["kind"])<0:k.addItem("区间 / 非对称设置",u["kind"])
+                    k.setCurrentIndex(k.findData(u["kind"]));a.setText("" if u.get("amount") is None else str(u["amount"]))
+            def safe_edit(checked=False, action=edit_uncertainty):
+                try: action()
+                except Exception as exc: QMessageBox.warning(self,"误差设置未保存",user_error(exc))
+            detail.clicked.connect(safe_edit);row.addWidget(detail)
+            form.addRow(help_label(f"{f['label']} ({f.get('unit','1')})",name),row)
+            attach_help(value,name);attach_help(amount,"uncertainty");attach_help(kind,"uncertainty")
             self.cells[name]=value,amount,kind,note,uncertainty
         self.status=QComboBox()
         for label,code in (("完成","completed"),("部分结果","partial"),("进行中","running"),("失败","failed"),("取消","cancelled")):
@@ -68,8 +88,18 @@ class RecordDialog(QDialog):
         self.status.setCurrentIndex(max(0,self.status.findData(self.record.get("status","completed"))))
         self.note=QLineEdit(self.record.get("note",""))
         form.addRow("实验状态",self.status);form.addRow("整组备注",self.note)
-        buttons=QDialogButtonBox(QDialogButtonBox.Save|QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept);buttons.rejected.connect(self.reject);outer.addWidget(buttons)
+        buttons=chinese_buttons(QDialogButtonBox(QDialogButtonBox.Save|QDialogButtonBox.Cancel))
+        buttons.accepted.connect(self.validate_accept);buttons.rejected.connect(self.reject);outer.addWidget(buttons)
+
+    def validate_accept(self):
+        try:
+            values=self.values()
+            self.template.validate_conditions(values["conditions"], execution=False)
+            from experiment_planner.application.records import normalize_observations
+            normalize_observations(self.template, values["observations"])
+        except Exception as exc:
+            QMessageBox.warning(self,"记录未保存",user_error(exc));return
+        self.accept()
 
     def values(self):
         measurements={}
@@ -91,7 +121,7 @@ class MainWindow(QMainWindow):
         self.resize(1280,820)
         root=QWidget();self.setCentralWidget(root);layout=QVBoxLayout(root)
         toolbar=QHBoxLayout();layout.addLayout(toolbar)
-        for label,callback in (("新建项目",self.create_project),("打开项目",self.open_project),("关闭项目",self.close_project),("导入 CSV / Excel",self.import_data),("导出记录",self.export_data),("一致性备份",self.backup),("模板导出",self.export_template),("从模板新建",self.create_from_template)):
+        for label,callback in (("新建项目",self.create_project),("打开项目",self.open_project),("关闭项目",self.close_project)):
             button(label,lambda checked=False, f=callback:self.guard(f),toolbar)
         self.summary=QLabel("请选择或新建本地项目。当前为模拟验证原型，Windows 与正式离线发布尚未验收。")
         self.summary.setWordWrap(True);layout.addWidget(self.summary)
@@ -100,6 +130,9 @@ class MainWindow(QMainWindow):
         button("录入实验",lambda:self.guard(self.add_record),actions)
         button("更正选中实验 / 回填",lambda:self.guard(self.edit_record),actions)
         self.table=QTableWidget();self.table.setSelectionBehavior(QAbstractItemView.SelectRows);self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        self.header_help=HelpFilter(self.table)
+        self.table.horizontalHeader().viewport().installEventFilter(self.header_help)
         record_layout.addWidget(self.table);self.tabs.addTab(records,"实验记录")
         next_page=QWidget();form=QFormLayout(next_page)
         self.ratio=QComboBox()
@@ -111,11 +144,11 @@ class MainWindow(QMainWindow):
         for label,code in (("默认 GP / RBF","gp_rbf_v1"),("GP / Matérn 2.5","gp_matern25_v1"),("贝叶斯线性回归（非 GP）","bayesian_linear_v1")): self.model.addItem(label,code)
         self.n=QSpinBox();self.n.setRange(1,100);self.n.setValue(6)
         self.mode=QComboBox()
-        for label,code in (("全范围探索","full_space"),("相对基准恰好改变一项","single"),("相对基准最多改变两项","double")): self.mode.addItem(label,code)
+        for label,code in (("全范围搜索","full_space"),("相对基准恰好改变一项","single"),("相对基准最多改变两项","double")): self.mode.addItem(label,code)
         self.baseline=QComboBox()
         self.variables=QLineEdit();self.variables.setPlaceholderText("可选：内部字段名，逗号分隔；留空自动选择")
         self.repeats=QLineEdit();self.repeats.setPlaceholderText("可选：实验编号，逗号分隔；全部计入本轮 n")
-        for label,widget in (("数值模型",self.model),("本轮新增总数 n",self.n),("变化模式",self.mode),("基准实验",self.baseline),("允许变化的字段",self.variables),("复测实验编号",self.repeats)):form.addRow(label,widget)
+        for label,widget in (("数值模型",self.model),("本轮实验总数 n",self.n),("变化模式",self.mode),("基准实验",self.baseline),("允许变化的字段",self.variables),("复测实验编号",self.repeats)):form.addRow(label,widget)
         self.generate_button=QPushButton("计算并保存下一批实验")
         self.generate_button.clicked.connect(lambda:self.guard(self.generate));form.addRow(self.generate_button)
         self.cancel_button=QPushButton("取消计算");self.cancel_button.clicked.connect(self.cancel);form.addRow(self.cancel_button)
@@ -126,7 +159,10 @@ class MainWindow(QMainWindow):
 
     def guard(self, callback):
         try: callback()
-        except Exception as exc: QMessageBox.warning(self,"操作未完成",str(exc))
+        except Exception as exc:
+            box=QMessageBox(self);box.setWindowTitle("操作未完成");box.setIcon(QMessageBox.Icon.Warning)
+            box.setText(user_error(exc));box.setDetailedText(f"{type(exc).__name__}: {exc}")
+            box.setStandardButtons(QMessageBox.StandardButton.Ok);box.button(QMessageBox.StandardButton.Ok).setText("知道了");box.exec()
 
     def require_project(self):
         if self.service is None: raise ValidationError("请先打开或新建项目")
@@ -157,6 +193,9 @@ class MainWindow(QMainWindow):
         p=self.require_project();records=p.experiments();fields=p.template.parameters+p.template.metrics
         headers=["编号","状态",*[f"{f['label']} ({f.get('unit','1')})" for f in fields],"备注"]
         self.table.setColumnCount(len(headers));self.table.setHorizontalHeaderLabels(headers);self.table.setRowCount(len(records))
+        for index,f in enumerate(fields,2):
+            self.table.horizontalHeaderItem(index).setData(Qt.ItemDataRole.UserRole,f["name"])
+            self.table.horizontalHeaderItem(index).setToolTip(f.get("note") or f.get("label",f["name"]))
         status_names={"completed":"完成","partial":"部分结果","failed":"失败","cancelled":"取消","pending":"待做","running":"进行中"}
         self.baseline.clear();self.baseline.addItem("不指定",None)
         for i,e in enumerate(records):
@@ -177,7 +216,7 @@ class MainWindow(QMainWindow):
         pending=sum(e["status"] in ("pending","running") for e in records)
         self.summary.setText(f"{p.name} | 数据版本 {p.revision} | 模板版本 {p.template.data['template_version']} | 实验 {len(records)} 条 | 待做/进行中 {pending} 条\n{p.path}")
         batches=p.batches()
-        if batches:self.details.setPlainText(json.dumps({k:v for k,v in batches[-1].items() if k!="ax_snapshot"},ensure_ascii=False,indent=2))
+        if batches:self.details.setPlainText(batch_text(batches[-1],p.template))
 
     def add_record(self):
         p=self.require_project();dialog=RecordDialog(p.template,parent=self)

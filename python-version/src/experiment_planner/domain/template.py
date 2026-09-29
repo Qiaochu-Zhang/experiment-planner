@@ -118,6 +118,11 @@ class Template:
             if fields[obj["metric"]].get("value_type") in ("text", "category"): raise ValidationError("文字和类别不能直接作为数值目标")
             if obj.get("direction") not in ("minimize", "maximize"): raise ValidationError("目标方向无效")
             if obj.get("transform", "identity") not in ("identity", "abs", "absolute_distance"): raise ValidationError("未知目标变换")
+            if obj.get("transform") == "absolute_distance" and (type(obj.get("target")) not in (int, float) or not math.isfinite(obj["target"])):
+                raise ValidationError("接近指定值的目标需要有限数值 target")
+        config = d.get("optimization", {})
+        if config.get("mode") not in ("pareto", "single", "weighted"):
+            raise ValidationError("优化模式请选择多目标折中、单目标或加权目标")
         policy = d.get("ratio_policy", {"mode": "remove"})
         if policy.get("mode") not in ("require_configuration", "valid_region", "stabilized", "remove"):
             raise ValidationError("未知分母策略")
@@ -125,6 +130,29 @@ class Template:
             epsilon = policy.get("epsilon_nm")
             if type(epsilon) not in (int, float) or not math.isfinite(epsilon) or epsilon <= 0:
                 raise ValidationError("分母策略需要大于零的 epsilon（nm）")
+        from experiment_planner.metrics.ratio import ratio_definition
+        definition = ratio_definition(self)
+        if definition and not set(definition[1:3]) <= {f["name"] for f in self.responses}:
+            raise ValidationError("分母策略的分子、分母必须是基础响应")
+        active = [o for o in d.get("objectives", []) if not (policy["mode"] == "remove" and o["metric"] == policy.get("original_metric"))]
+        if not active:
+            raise ValidationError("至少保留一个参与优化的目标")
+        if config["mode"] == "single" and len(active) != 1:
+            raise ValidationError("单目标模式必须恰好选择一个参与优化的目标")
+        if config["mode"] == "weighted":
+            weights, scales = config.get("weights"), config.get("scales")
+            if not isinstance(weights, list) or not isinstance(scales, list) or len(weights) != len(active) or len(scales) != len(active) or any(type(v) not in (int,float) or not math.isfinite(v) for v in [*weights, *scales]) or any(v < 0 for v in weights) or sum(weights) <= 0 or any(v <= 0 for v in scales):
+                raise ValidationError("加权模式需为每个有效目标设置非负权重及正归一化尺度，权重不能全部为零")
+        defaults = d.get("batch_defaults", {})
+        for key, lo, hi, default in (("total_count",1,100,6),("exploration_count",0,100,0),("pool_size",1,10000,128),("seed",0,2147483647,0)):
+            value=defaults.get(key,default)
+            if type(value) is not int or not lo <= value <= hi:
+                raise ValidationError(f"推荐默认设置 {key} 必须是 {lo}–{hi} 的整数")
+        strength=defaults.get("exploration_strength",0)
+        if type(strength) not in (int,float) or not math.isfinite(strength) or not 0 <= strength <= 100:
+            raise ValidationError("推荐默认探索强度必须是 0–100 的有限数值")
+        if defaults.get("exploration_count",0) > defaults.get("total_count",6) - len(defaults.get("repeat_ids",[])):
+            raise ValidationError("默认专门探索名额超过扣除复测后的新条件名额")
         for constraint in d.get("input_constraints", []):
             if constraint.get("op") not in ("<=", ">=") or not constraint.get("coefficients"):
                 raise ValidationError("仅支持明确系数的线性输入约束")
