@@ -22,7 +22,7 @@ class Project:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys=ON")
         try:
-            if self.db.execute("PRAGMA user_version").fetchone()[0] != 1:
+            if self.db.execute("PRAGMA user_version").fetchone()[0] not in (1, 2):
                 raise ValidationError("不支持此数据库结构版本；请保留原文件并使用对应版本")
             self.template = Template(json.loads(self.db.execute("SELECT template FROM project WHERE id=1").fetchone()[0]))
         except Exception:
@@ -89,12 +89,15 @@ class Project:
         self.db.execute("INSERT INTO change_log(revision,entity,entity_id,old_payload,new_payload,created) VALUES(?,?,?,?,?,?)", (self.revision, entity, str(entity_id), encode(old), encode(new), now()))
 
     def experiments(self):
-        return [{"id": row["id"], **json.loads(row["payload"])} for row in self.db.execute("SELECT id,payload FROM experiments ORDER BY id")]
+        records = [{"id": row["id"], **json.loads(row["payload"])} for row in self.db.execute("SELECT id,payload FROM experiments ORDER BY id")]
+        return [record for record in records if not record.get("deleted_at")]
 
     def experiment(self, experiment_id):
         row = self.db.execute("SELECT payload FROM experiments WHERE id=?", (experiment_id,)).fetchone()
         if row is None: raise ValidationError("实验编号不存在")
-        return {"id": experiment_id, **json.loads(row[0])}
+        record = json.loads(row[0])
+        if record.get("deleted_at"): raise ValidationError(f"实验 {experiment_id} 已删除")
+        return {"id": experiment_id, **record}
 
     def batches(self):
         return [{"id": r[0], "revision": r[1], **json.loads(r[2])} for r in self.db.execute("SELECT id,revision,payload FROM batches ORDER BY id")]

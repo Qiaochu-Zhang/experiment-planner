@@ -42,6 +42,38 @@ class PlannerService:
             p.bump()
             p.log("experiment", experiment_id, old, new)
 
+    def delete_records(self, experiment_ids, expected_revision=None):
+        """Remove active records atomically, retaining audit data and stable IDs."""
+        ids = list(experiment_ids)
+        if not ids or any(type(eid) is not int or eid <= 0 for eid in ids):
+            raise ValidationError("请选择至少一条有效实验记录")
+        ids = list(dict.fromkeys(ids))
+        p = self.project
+        with p.transaction(expected_revision):
+            records = [p.experiment(eid) for eid in ids]
+            old_template = p.template
+            defaults = copy.deepcopy(old_template.data.get("batch_defaults", {}))
+            if defaults.get("baseline_experiment_id") in ids:
+                defaults["baseline_experiment_id"] = None
+            if "repeat_ids" in defaults:
+                defaults["repeat_ids"] = [eid for eid in defaults["repeat_ids"] if eid not in ids]
+            revised = old_template.revised(batch_defaults=defaults) if defaults != old_template.data.get("batch_defaults", {}) else None
+            # Older applications must not reopen tombstones as active experiments.
+            p.db.execute("PRAGMA user_version=2")
+            p.bump()
+            for old in records:
+                eid = old["id"]
+                removed = {**old, "deleted_at": now()}
+                removed.pop("id")
+                # Keep the row so SQLite never reuses an audited experiment ID.
+                # Release import identity so the same source can be imported again.
+                p.db.execute("UPDATE experiments SET payload=?, import_key=NULL WHERE id=?", (encode(removed), eid))
+                p.log("experiment_delete", eid, old, removed)
+            if revised:
+                p.db.execute("UPDATE project SET template=? WHERE id=1", (encode(revised.data),))
+                p.log("template", 1, old_template.data, revised.data)
+        return ids
+
     def import_records(self, records, expected_revision):
         p = self.project
         prepared = []

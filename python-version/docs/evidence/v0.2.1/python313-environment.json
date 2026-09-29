@@ -1,0 +1,26 @@
+{
+  "python": "3.13.15 (main, Sep 24 2026, 17:55:50) [Clang 22.1.3 ]",
+  "platform": "Linux-7.0.0-1013-aws-x86_64-with-glibc2.39",
+  "exit_code": 0,
+  "elapsed_seconds": 82.13,
+  "command": [
+    "/tmp/experiment-planner-313/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--junitxml",
+    "/home/ubuntu/projects/experiment-planner/python-version/docs/evidence/v0.2.1/python313-tests.xml"
+  ],
+  "qt_platform": "offscreen",
+  "packages": {
+    "pytest": "9.1.1",
+    "PySide6": "6.11.2",
+    "torch": "2.14.0+cpu",
+    "botorch": "0.18.1",
+    "ax-platform": "1.3.1",
+    "gpytorch": "1.15.2",
+    "openpyxl": "3.1.5"
+  }
+}

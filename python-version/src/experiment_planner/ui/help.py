@@ -1,10 +1,12 @@
 """Offline, clickable help for labels, controls and table headers."""
 from html import escape
 from importlib.resources import files
+from weakref import ref
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer, QUrl
+from PySide6.QtCore import QEvent, QObject, QRect, Qt, QTimer, QUrl
 from PySide6.QtGui import QCursor, QDesktopServices, QTextCursor
 from PySide6.QtWidgets import QDialog, QFrame, QHBoxLayout, QLabel, QListWidget, QPushButton, QTextBrowser, QVBoxLayout
+from shiboken6 import isValid
 
 
 TOPICS = {
@@ -27,6 +29,7 @@ TOPICS = {
     "uncertainty": ("测量不确定度", "填写 ± 值时选择标准不确定度、均值标准误、区间或误差界限；未知不确定度不等于零。"),
     "template": ("可视化模板编辑", "常用设置使用专用表单；其他属性可在树形编辑器逐项增删、修改，无需手写 JSON。"),
     "duplicates": ("同条件重复实验", "允许相同工艺条件对应不同结果；每次真实实验使用独立编号，导入时使用不同 external_id。"),
+    "delete_records": ("删除实验记录", "支持鼠标单选或多选，确认后移出当前训练、推荐和导出；删除前数据保留在审计中。"),
     "favorites": ("自定义常用功能", "勾选要显示在常用工作台的功能，设置会保存在当前电脑。"),
     "prediction": ("预测与趋势图", "模型给出潜在响应分布；区间不包含未知的未来量测噪声，原始比值只报告样本分位数。"),
     "cl2_sccm": ("Cl2 流量", "氯气流量，单位 sccm；允许范围由项目模板定义。"),
@@ -88,7 +91,7 @@ def show_help(key="overview", parent=None):
 
 
 class HelpPopup(QFrame):
-    def __init__(self, key, parent=None, description=None):
+    def __init__(self, key, parent=None, description=None, *, source=None, source_rect=None):
         super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setStyleSheet("QFrame {background:white;border:1px solid #b9c8dc;border-radius:7px;} QLabel {border:none;padding:6px;}")
@@ -99,8 +102,49 @@ class HelpPopup(QFrame):
         label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         label.linkActivated.connect(lambda _: (self.hide(), show_help(key, parent)))
         layout.addWidget(label)
-        self.timer = QTimer(self); self.timer.setInterval(12000)
-        self.timer.timeout.connect(self.hide); self.timer.start()
+        self.source = ref(source) if source is not None else lambda: None
+        self.source_rect = source_rect
+        self.timer = QTimer(self); self.timer.setInterval(1000); self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.expire)
+        # Tracking also detects moving between columns of the same header viewport.
+        self.tracker = QTimer(self); self.tracker.setInterval(50)
+        self.tracker.timeout.connect(self.check_cursor)
+
+    def cursor_inside(self):
+        position = QCursor.pos()
+        source = self.source()
+        over_source = source is not None and isValid(source) and source.isVisible() and (self.source_rect or source.rect()).contains(source.mapFromGlobal(position))
+        return over_source or self.rect().contains(self.mapFromGlobal(position))
+
+    def check_cursor(self):
+        if not self.isVisible(): return
+        source = self.source()
+        if source is None or not isValid(source) or not source.isVisible():
+            self.hide()
+        elif self.cursor_inside():
+            self.timer.stop()
+        elif not self.timer.isActive():
+            self.timer.start()
+
+    def expire(self):
+        if not self.cursor_inside(): self.hide()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.tracker.start()
+        self.check_cursor()
+
+    def hideEvent(self, event):
+        self.timer.stop(); self.tracker.stop()
+        super().hideEvent(event)
+
+    def enterEvent(self, event):
+        self.timer.stop()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.check_cursor()
+        super().leaveEvent(event)
 
 
 class HelpFilter(QObject):
@@ -109,17 +153,22 @@ class HelpFilter(QObject):
         self.popup = None
 
     def eventFilter(self, watched, event):
+        if self.popup and event.type() in (QEvent.Type.Enter, QEvent.Type.Leave):
+            self.popup.check_cursor()
         if event.type() == QEvent.Type.ToolTip:
             key = watched.property("helpKey")
+            source_rect = None
             if not key and hasattr(watched.parent(), "logicalIndexAt"):
                 header = watched.parent()
                 index = header.logicalIndexAt(event.pos())
                 table = header.parent()
                 item = table.horizontalHeaderItem(index) if hasattr(table, "horizontalHeaderItem") and index >= 0 else None
-                if item: key = item.data(Qt.ItemDataRole.UserRole)
+                if item:
+                    key = item.data(Qt.ItemDataRole.UserRole)
+                    source_rect = QRect(header.sectionViewportPosition(index), 0, header.sectionSize(index), watched.height())
             if key:
                 if self.popup: self.popup.close(); self.popup.deleteLater()
-                self.popup = HelpPopup(key, watched.window(), watched.property("helpDescription"))
+                self.popup = HelpPopup(key, watched.window(), watched.property("helpDescription"), source=watched, source_rect=source_rect)
                 self.popup.adjustSize()
                 position = event.globalPos()
                 screen = watched.screen().availableGeometry()

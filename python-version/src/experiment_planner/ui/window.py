@@ -129,10 +129,13 @@ class MainWindow(QMainWindow):
         records=QWidget();record_layout=QVBoxLayout(records);actions=QHBoxLayout();record_layout.addLayout(actions)
         button("录入实验",lambda:self.guard(self.add_record),actions)
         button("更正选中实验 / 回填",lambda:self.guard(self.edit_record),actions)
+        attach_help(button("删除选中实验",lambda:self.guard(self.delete_records),actions),"delete_records")
         self.table=QTableWidget();self.table.setSelectionBehavior(QAbstractItemView.SelectRows);self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setAlternatingRowColors(True)
         self.header_help=HelpFilter(self.table)
         self.table.horizontalHeader().viewport().installEventFilter(self.header_help)
+        record_layout.addWidget(QLabel("单击选中一行；按住 Ctrl 多选，按住 Shift 连续选择，也可拖动选择多行。"))
         record_layout.addWidget(self.table);self.tabs.addTab(records,"实验记录")
         next_page=QWidget();form=QFormLayout(next_page)
         self.ratio=QComboBox()
@@ -227,6 +230,28 @@ class MainWindow(QMainWindow):
         if row<0:raise ValidationError("请先选择实验行")
         eid=int(self.table.item(row,0).text());dialog=RecordDialog(p.template,p.experiment(eid),self)
         if dialog.exec():self.service.revise_record(eid,**dialog.values());self.refresh()
+
+    def delete_records(self):
+        p = self.require_project()
+        rows = self.table.selectionModel().selectedRows()
+        if not rows: raise ValidationError("请先用鼠标选择要删除的实验行")
+        ids = [int(self.table.item(row.row(), 0).text()) for row in sorted(rows, key=lambda row: row.row())]
+        revision = p.revision
+        box = QMessageBox(self)
+        box.setWindowTitle("删除选中的实验")
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setText(f"删除选中的 {len(ids)} 条实验？")
+        listed = "、".join(map(str, ids[:20])) + ("……" if len(ids) > 20 else "")
+        box.setInformativeText(f"实验编号：{listed}\n删除后不再用于训练、推荐或普通导出；审计记录、已有批次及其预测保留。已保存的基准与复测默认值会移除这些编号；需要基准的模式请重新选择。")
+        box.setDetailedText("全部待删除编号：" + "、".join(map(str, ids)) + "\n首次删除后，本项目需要使用 0.2.1 或后续支持删除功能的版本打开；旧版本不识别删除记录。")
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+        box.button(QMessageBox.StandardButton.Yes).setText("删除所选实验")
+        box.button(QMessageBox.StandardButton.Cancel).setText("取消")
+        box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        if box.exec() != QMessageBox.StandardButton.Yes: return
+        self.service.delete_records(ids, expected_revision=revision)
+        self.repeats.setText(",".join(value.strip() for value in self.repeats.text().split(",") if value.strip() and value.strip() not in {str(eid) for eid in ids}))
+        self.refresh()
 
     def save_ratio(self):
         p=self.require_project();mode=self.ratio.currentData()

@@ -24,7 +24,7 @@ from experiment_planner.ui.messages import analysis_text
 class PythonWindow(MainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("实验规划助手 · 0.2 · Python 3.12 / 3.13")
+        self.setWindowTitle("实验规划助手 · 0.2.1 · Python 3.12 / 3.13")
         self.loaded_template_key = None
         self.analysis_report = None
         self.summary.setText("新建或打开本地项目，录入实验后规划下一批条件。")
@@ -336,9 +336,15 @@ class PythonWindow(MainWindow):
             "backup":("备份项目",self.backup,"备份完整数据库和历史"),
         }
         self.preferences=QSettings("ExperimentPlanner","Desktop")
-        stored=self.preferences.value("favorites",["precision","priors","objectives","recommend","record","records","prediction"])
+        stored=self.preferences.value("favorites",["precision","priors","objectives","recommend","record","records","import","prediction"])
         self.favorite_ids=stored if isinstance(stored,list) else [stored]
         self.favorite_ids=list(dict.fromkeys(["precision","priors","objectives",*[k for k in self.favorite_ids if k in self.actions]]))
+        # Upgrade existing preferences once; later user removal remains respected.
+        if not self.preferences.value("import_favorite_initialized",False,type=bool):
+            if "import" not in self.favorite_ids:self.favorite_ids.append("import")
+            self.preferences.setValue("favorites",self.favorite_ids)
+            self.preferences.setValue("import_favorite_initialized",True)
+            self.preferences.sync()
         self.render_favorites()
         self.navigation.addTab(home,"常用功能");self.navigation.addTab(self.tabs,"更多功能")
         self.navigation.setCurrentIndex(0)

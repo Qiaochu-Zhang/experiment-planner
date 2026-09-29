@@ -1,4 +1,21 @@
-# Python 源码版 0.2 验证报告
+# Python 源码版 0.2.1 验证报告
+
+日期：2026-09-29。当前版本在 Linux x86_64、Qt offscreen 下用合成数据验证。首次删除会更新数据库版本，测试同时覆盖旧项目读取和删除后的项目恢复。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| Python 3.12.3 完整回归 | **127 项通过，0 失败，进程退出码 0**，约 79.39 秒。[日志](evidence/v0.2.1/python312-tests.txt)、[JUnit](evidence/v0.2.1/python312-tests.xml)、[环境与退出码](evidence/v0.2.1/python312-environment.json)。 |
+| Python 3.13.15 完整回归 | **127 项通过，0 失败，进程退出码 0**，约 78.43 秒。[日志](evidence/v0.2.1/python313-tests.txt)、[JUnit](evidence/v0.2.1/python313-tests.xml)、[环境与退出码](evidence/v0.2.1/python313-environment.json)。 |
+| 安装包 | 0.2.1 wheel 构建成功，逐文件核对包内源码和资源与当前目录一致，元数据支持 Python 3.13。[检查记录](evidence/v0.2.1/wheel-check.json)。 |
+| 界面 | 已检查合成数据的[常用页导入入口](evidence/v0.2.1/home.png)、[鼠标多选](evidence/v0.2.1/records.png)、[删除确认框](evidence/v0.2.1/delete-confirmation.png)。 |
+
+本轮新增 12 项回归，覆盖单条/多条选择、确认/取消、写入失败整批回滚、旧确认版本拒绝、删除标记与数据库版本一起回滚、编号不复用、基准/复测默认值清理、旧批次保留、备份恢复、重新导入、模型/Ax/导出排除删除记录、悬停离开延迟关闭、返回变量和进入弹窗取消关闭、表头换列，以及常用配置升级和取消导入后的持久化。
+
+两套完整测试各保留 13 条依赖弃用和数值稳定警告，详情见原始日志。核对通过不代表 Windows/macOS 人工点击或真实机台效果已经验收。仅修改 `python-version`；导入空行机制、静态帮助生成方式和混合噪声算法没有改动，相关解释见 [回答.md](../回答.md)。源码摘要及文档链接检查见 [总记录](evidence/v0.2.1/summary.json)。
+
+复现：在 `python-version` 目录使用对应 Python 环境运行 `python -m pytest -q -p no:cacheprovider`；无桌面 Linux 设置 `QT_QPA_PLATFORM=offscreen`。
+
+## 0.2.0 历史验证（以下证据未覆盖本轮新功能）
 
 日期：2026-09-29。环境：Linux x86_64，Qt offscreen；测试使用合成数据。源文件摘要和退出码见 [机器可读总报告](evidence/v0.2/summary.json)。
 
