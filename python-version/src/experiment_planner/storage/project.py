@@ -71,6 +71,12 @@ class Project:
 
     @contextmanager
     def transaction(self, expected=None):
+        if self.db.in_transaction:
+            if expected is not None and self.revision != expected:
+                raise StaleVersionError("项目已修改，请基于最新数据重新计算")
+            # The service action owns the outer atomic transaction.
+            yield
+            return
         self.db.execute("BEGIN IMMEDIATE")
         try:
             if expected is not None and self.revision != expected:
@@ -87,6 +93,16 @@ class Project:
 
     def log(self, entity, entity_id, old, new):
         self.db.execute("INSERT INTO change_log(revision,entity,entity_id,old_payload,new_payload,created) VALUES(?,?,?,?,?,?)", (self.revision, entity, str(entity_id), encode(old), encode(new), now()))
+
+    def insert_experiment(self, record, import_key=None):
+        """Allocate the smallest free active number inside the caller's transaction."""
+        active = {row[0] for row in self.db.execute("SELECT id,payload FROM experiments")
+                  if not json.loads(row[1]).get("deleted_at")}
+        eid = 1
+        while eid in active: eid += 1
+        self.db.execute("DELETE FROM experiments WHERE id=?", (eid,))
+        return self.db.execute("INSERT INTO experiments(id,payload,import_key) VALUES(?,?,?)",
+                               (eid, encode(record), import_key))
 
     def experiments(self):
         records = [{"id": row["id"], **json.loads(row["payload"])} for row in self.db.execute("SELECT id,payload FROM experiments ORDER BY id")]

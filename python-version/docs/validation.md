@@ -76,3 +76,17 @@ python examples/workflow.py --output local-data/workflow
 尚未在本环境完成 Windows/macOS 人工操作、PyCharm 人工点击、真实机台回测或自由线程 Python 验证。当前功能边界见 [coverage.md](coverage.md)。
 
 原 0.1 测试原始材料继续保存在 evidence 及历史审计文档中，其测试数量与绝对值目标不能作为 0.2 当前行为或验收结论。
+
+## 2026-09-30 · 显示、撤销、数据交换与时间趋势
+
+在 Linux / CPython 3.12、Qt offscreen、CPU PyTorch 环境执行：
+
+```bash
+.venv/bin/python -m pytest -c python-version/pyproject.toml python-version/tests -q
+```
+
+结果：**169 passed，14 warnings，117.13 秒**。警告包括依赖接口弃用和 GP 数值稳定 jitter 提示，无失败。最后两项小调整（输出使用计算时模板、导入空表头校验）相关 GUI/数据交换回归再次通过，共 12 项。本轮未重新验证 Python 3.13 或真实 Windows 图形桌面。
+
+新增回归覆盖：删除/恢复/再次删除、编号复用及 UID、模板默认引用恢复、更正/导入/模板撤销重做、去重标识、外部窗口修改保护、撤销失败事务回滚、CSV/Excel 空表填入后的真实导入、图线缓存导出完整精度及字面文本、大小写快捷键、文字编辑与项目历史分流、测量/指标显示配置持久化、模板变量不弹帮助。
+
+三种模型均验证：固定其他输入、变化时间、累计厚度差按人工线性规律变化时，预测随时间递增，均值数量级保持累计 nm，单变量图线点可完整导出。增加固定输入的覆盖不足提示，以及未知噪声线性回归残差自由度按有效秩计算的检查。合成案例只验证软件数学管线，不证明真实机台物理规律或用户具体数据的预测准确度。

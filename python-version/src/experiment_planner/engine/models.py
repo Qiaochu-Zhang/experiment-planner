@@ -189,8 +189,12 @@ def fit_models(template, experiments, preset, seed=0):
             if variance is None:
                 # Explicit empirical residual estimate; never claim measurement error=0.
                 phi = torch.cat([torch.ones_like(reduced[:, :1]), reduced], -1)
-                beta = torch.linalg.lstsq(phi, y).solution
-                mse = (y - phi @ beta).square().sum() / max(1, len(y)-phi.shape[-1])
+                # Fixed inputs and few records often make the design rank deficient.
+                # SVD handles that design and supplies the effective residual degrees.
+                least_squares = torch.linalg.lstsq(phi, y, driver="gelsd")
+                beta = least_squares.solution
+                rank = int(least_squares.rank.item())
+                mse = (y - phi @ beta).square().sum() / max(1, len(y)-rank)
                 noise = max(mse.item(), y.var().item() * .01, 1e-6)
                 variance = torch.full_like(y, noise)
                 notices.append(f"{name}: 未提供误差；经验残差方差={noise:.8g}，少数据时有局限")
@@ -204,5 +208,16 @@ def fit_models(template, experiments, preset, seed=0):
             notices.append(f"{name}: {'已提供观测方差 u²' if variance is not None else 'GP 估计未知噪声'}")
         models.append(ProjectedModel(inner, active, trend))
         names.append(name)
-        datasets[name] = {"count": len(records), "features": [p["name"] for p in encoder.fields if any(i in active for i in encoder.indices[p["name"]])], "conditions": [r[0] for r in records]}
+        feature_ranges = {}
+        for field in encoder.fields:
+            if not any(i in active for i in encoder.indices[field["name"]]): continue
+            observed = [r[0][field["name"]] for r in records]
+            unique = len(set(observed))
+            feature_ranges[field["name"]] = {"unique_count": unique}
+            if field.get("value_type", "float") in ("float", "int"):
+                feature_ranges[field["name"]].update(min=min(observed), max=max(observed))
+            if unique == 1:
+                notices.append(f"{response.get('label', name)}：有效训练记录中的 {field.get('label', field['name'])} 只有一个取值；无法从这些数据识别其影响，平坦预测不代表物理无关")
+        datasets[name] = {"count": len(records), "features": [p["name"] for p in encoder.fields if any(i in active for i in encoder.indices[p["name"]])], "feature_ranges": feature_ranges, "conditions": [r[0] for r in records]}
+
     return ModelList(*models), encoder, names, datasets, ["各基础响应条件独立；同一响应保留候选点间相关性", "区间表示潜在响应，不包含未提供的未来测量误差", *notices]

@@ -100,7 +100,7 @@ def test_help_disappears_after_one_second_but_popup_remains_clickable(qt_applica
 
 def test_header_help_closes_when_pointer_moves_to_another_column(qt_application):
     table = QTableWidget(1, 2); table.resize(600, 250)
-    for index, key in enumerate(("cl2_sccm", "rf_w")):
+    for index, key in enumerate(("model", "precision")):
         item = QTableWidgetItem(key); item.setData(Qt.ItemDataRole.UserRole, key)
         table.setHorizontalHeaderItem(index, item); table.setColumnWidth(index, 250)
     header = table.horizontalHeader(); source = header.viewport()

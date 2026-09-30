@@ -2,11 +2,11 @@
 import json
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QFileDialog, QMessageBox, QTabWidget, QTableWidget, QTableWidgetItem,
     QComboBox, QSpinBox, QLineEdit, QFormLayout, QDialog, QDialogButtonBox,
-    QScrollArea, QAbstractItemView, QPlainTextEdit)
+    QScrollArea, QAbstractItemView, QPlainTextEdit, QApplication)
 
 from experiment_planner.application.service import PlannerService
 from experiment_planner.domain.template import Template
@@ -45,8 +45,7 @@ class RecordDialog(QDialog):
             if "bounds" in f: editor.setPlaceholderText(f"{f['bounds'][0]} – {f['bounds'][1]}")
             note = QLineEdit(self.record.get("field_notes",{}).get(name,"")); note.setPlaceholderText("参数备注")
             row = QHBoxLayout(); row.addWidget(editor); row.addWidget(note)
-            form.addRow(help_label(f"{f.get('label',name)} ({f.get('unit','1')})", name, f.get("note") or None), row)
-            attach_help(editor, name, f.get("note") or None)
+            form.addRow(QLabel(f"{f.get('label',name)} ({f.get('unit','1')})"), row)
             self.inputs[name] = editor, note
         form.addRow(QLabel("原始测量：留空表示未测；± 值必须选择含义"))
         for f in template.measurements:
@@ -79,8 +78,8 @@ class RecordDialog(QDialog):
                 try: action()
                 except Exception as exc: QMessageBox.warning(self,"误差设置未保存",user_error(exc))
             detail.clicked.connect(safe_edit);row.addWidget(detail)
-            form.addRow(help_label(f"{f.get('label',name)} ({f.get('unit','1')})",name),row)
-            attach_help(value,name);attach_help(amount,"uncertainty");attach_help(kind,"uncertainty")
+            form.addRow(QLabel(f"{f.get('label',name)} ({f.get('unit','1')})"),row)
+            attach_help(amount,"uncertainty");attach_help(kind,"uncertainty")
             self.cells[name]=value,amount,kind,note,uncertainty
         self.status=QComboBox()
         for label,code in (("完成","completed"),("部分结果","partial"),("进行中","running"),("失败","failed"),("取消","cancelled")):
@@ -157,8 +156,39 @@ class MainWindow(QMainWindow):
         self.cancel_button=QPushButton("取消计算");self.cancel_button.clicked.connect(self.cancel);form.addRow(self.cancel_button)
         self.details=QPlainTextEdit();self.details.setReadOnly(True);form.addRow("批次说明与预测",self.details)
         self.tabs.addTab(next_page,"下一批实验")
+        self.undo_button = attach_help(button("撤销上一步 (Ctrl+Z)", lambda:self.guard(lambda:self.history_step(False)), toolbar), "history")
+        self.redo_button = attach_help(button("重做下一步 (Ctrl+Y)", lambda:self.guard(lambda:self.history_step(True)), toolbar), "history")
+        QApplication.instance().installEventFilter(self)
         self.timer=QTimer(self);self.timer.setInterval(200);self.timer.timeout.connect(self.poll)
         self.setStyleSheet("QMainWindow {background:#f4f7fa;} QPushButton {padding:7px 10px;} QTabWidget::pane {border:1px solid #d9e1e8;} QLineEdit,QComboBox,QSpinBox {padding:5px;} QTableWidget {background:white;}")
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress):
+            modifiers = event.modifiers()
+            if (modifiers & Qt.KeyboardModifier.ControlModifier
+                    and not modifiers & (Qt.KeyboardModifier.AltModifier | Qt.KeyboardModifier.MetaModifier)
+                    and event.key() in (Qt.Key.Key_Z, Qt.Key.Key_Y)
+                    and QApplication.activeModalWidget() is None
+                    and QApplication.activeWindow() is self):
+                if event.type() == QEvent.Type.ShortcutOverride:
+                    event.accept()
+                else:
+                    self.guard(lambda:self.history_step(event.key() == Qt.Key.Key_Y, from_keyboard=True))
+                return True
+        return super().eventFilter(watched, event)
+
+    def history_step(self, redo, from_keyboard=False):
+        # Text entry keeps local undo history; modal dialogs own their edits.
+        if QApplication.activeModalWidget() is not None: return
+        widget = QApplication.focusWidget()
+        if from_keyboard and isinstance(widget, (QLineEdit, QPlainTextEdit)) and not widget.isReadOnly():
+            widget.redo() if redo else widget.undo()
+            return
+        self.require_project()
+        if self.task or getattr(self, "analysis_task", None):
+            raise ValidationError("请先取消或等待当前计算结束，再撤销或重做")
+        self.service.redo() if redo else self.service.undo()
+        self.refresh()
 
     def guard(self, callback):
         try: callback()
@@ -197,8 +227,8 @@ class MainWindow(QMainWindow):
         headers=["编号","状态",*[f"{f.get('label',f['name'])} ({f.get('unit','1')})" for f in fields],"备注"]
         self.table.setColumnCount(len(headers));self.table.setHorizontalHeaderLabels(headers);self.table.setRowCount(len(records))
         for index,f in enumerate(fields,2):
-            self.table.horizontalHeaderItem(index).setData(Qt.ItemDataRole.UserRole,f["name"])
-            self.table.horizontalHeaderItem(index).setToolTip(f.get("note") or f.get("label",f["name"]))
+            self.table.horizontalHeaderItem(index).setData(Qt.ItemDataRole.UserRole,None)
+            self.table.horizontalHeaderItem(index).setToolTip("")
         status_names={"completed":"完成","partial":"部分结果","failed":"失败","cancelled":"取消","pending":"待做","running":"进行中"}
         self.baseline.clear();self.baseline.addItem("不指定",None)
         for i,e in enumerate(records):
@@ -242,7 +272,7 @@ class MainWindow(QMainWindow):
         box.setIcon(QMessageBox.Icon.Warning)
         box.setText(f"删除选中的 {len(ids)} 条实验？")
         listed = "、".join(map(str, ids[:20])) + ("……" if len(ids) > 20 else "")
-        box.setInformativeText(f"实验编号：{listed}\n删除后不再用于训练、推荐或普通导出；审计记录、已有批次及其预测保留。已保存的基准与复测默认值会移除这些编号；需要基准的模式请重新选择。")
+        box.setInformativeText(f"实验编号：{listed}\n删除后不再用于训练、推荐或普通导出；可按 Ctrl+Z 撤销。空缺编号可复用，审计记录、已有批次及其预测保留。已保存的基准与复测默认值会移除这些编号；需要基准的模式请重新选择。")
         box.setDetailedText("全部待删除编号：" + "、".join(map(str, ids)) + "\n首次删除后，本项目需要使用 0.2.1 或后续支持删除功能的版本打开；旧版本不识别删除记录。")
         box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
         box.button(QMessageBox.StandardButton.Yes).setText("删除所选实验")
@@ -307,4 +337,5 @@ class MainWindow(QMainWindow):
         self.timer.stop();self.generate_button.setEnabled(True)
 
     def closeEvent(self,event):
+        QApplication.instance().removeEventFilter(self)
         self.close_project();event.accept()

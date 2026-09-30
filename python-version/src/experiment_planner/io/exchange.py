@@ -167,3 +167,76 @@ def export_records(project, path):
         wb.save(path)
         wb.close()
     else: raise ValidationError("导出支持 CSV / XLSX / JSON")
+
+
+def write_table(path, headers, rows, title):
+    """Write numeric values at full precision, and spreadsheet text literally."""
+    path = Path(path)
+    if path.suffix.lower() == ".csv":
+        with path.open("w", encoding="utf-8-sig", newline="") as target:
+            writer = csv.DictWriter(target, fieldnames=headers)
+            writer.writeheader(); writer.writerows(rows)
+    elif path.suffix.lower() == ".xlsx":
+        from openpyxl import Workbook
+        workbook = Workbook(); sheet = workbook.active; sheet.title = title
+        sheet.append(headers)
+        for row in rows:
+            sheet.append([row.get(key) for key in headers])
+        for cells in sheet:
+            for cell in cells:
+                if isinstance(cell.value, str): cell.data_type = "s"
+        sheet.freeze_panes = "A2"
+        workbook.save(path); workbook.close()
+    else:
+        raise ValidationError("请选择 CSV 或 Excel (.xlsx)")
+
+
+def export_import_template(template, path):
+    """A header-only input file, accepted by the normal importer after filling."""
+    headers = ["external_id", "status", "note"]
+    for field in template.parameters:
+        headers.extend([field["name"], field["name"] + "_note"])
+    for field in template.measurements:
+        name = field["name"]
+        headers.extend([name, *[name + suffix for suffix in
+            ("_unit", "_uncertainty", "_uncertainty_kind", "_distribution",
+             "_coverage_factor", "_confidence", "_note")]])
+    checked_headers(headers)
+    path = Path(path)
+    write_table(path, headers, [], "导入数据")
+    if path.suffix.lower() == ".xlsx":
+        from openpyxl import load_workbook
+        wb = load_workbook(path)
+        help_sheet = wb.create_sheet("填写说明")
+        help_sheet.append(["模板", template.data.get("name", ""), "版本", template.data["template_version"]])
+        help_sheet.append(["提示", "只在“导入数据”填写记录；不要在数据中间留空行。每次复测填写不同 external_id。"])
+        help_sheet.append(["状态", "留空为 completed；可填 completed / partial / pending / running / failed / cancelled。"])
+        help_sheet.append(["误差类型", "std / sem / bounds / interval / unspecified；只填 ± 数字不代表已知标准误差。"])
+        help_sheet.append(["列名", "显示名称", "单位", "类型", "范围 / 取值", "备注"])
+        for field in template.parameters + template.measurements:
+            help_sheet.append([field["name"], field.get("label", field["name"]), field.get("unit", "1"),
+                field.get("value_type", "float"), json.dumps(field.get("bounds", field.get("values", field.get("fixed_value"))), ensure_ascii=False), field.get("note", "")])
+        for cells in help_sheet:
+            for cell in cells:
+                if isinstance(cell.value, str): cell.data_type = "s"
+        wb.active = 0; wb.save(path); wb.close()
+
+
+def export_analysis(report, template, path):
+    """Export exactly the cached prediction and plotted samples; do not refit."""
+    rows = []
+    for source, data in (("预测", report), ("趋势图", report.get("plot", {}))):
+        for index, (condition, prediction) in enumerate(zip(data.get("conditions", []), data.get("predictions", [])), 1):
+            for name, item in prediction.items():
+                if not isinstance(item, dict) or "quantiles" not in item: continue
+                q = item.get("quantiles") or [None, None, None]
+                field = next((f for f in template.fields if f["name"] == name), {})
+                rows.append({"来源": source, "点序号": index, "数据版本": report["revision"],
+                    "模板版本": report["template_version"], "模型": report["model"], "随机种子": prediction.get("seed"),
+                    **condition, "指标": name, "指标名称": field.get("label", name), "单位": field.get("unit", "1"),
+                    "后验均值": item.get("mean"), "下限2.5%": q[0], "中位数50%": q[1], "上限97.5%": q[2],
+                    "区间类型": item.get("interval_kind"), "预测可行概率": prediction.get("feasibility_probability"),
+                    "说明": item.get("moment_notice", "")})
+    if not rows: raise ValidationError("请先完成预测或趋势图计算")
+    headers = list(rows[0])
+    write_table(path, headers, rows, "预测与趋势数据")

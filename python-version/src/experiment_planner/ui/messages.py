@@ -1,6 +1,7 @@
 """Chinese presentation; original diagnostics remain available for debugging."""
 import json
 
+from experiment_planner.precision.rounding import display
 from experiment_planner.domain.errors import ValidationError, StaleVersionError
 
 
@@ -42,19 +43,29 @@ def batch_text(batch, template):
     for i, c in enumerate(batch["candidates"], 1):
         lines.append(f"\n{i}. {kinds.get(c['arrangement'], c['arrangement'])}：" + "，".join(f"{labels.get(k,k)}={v:g}" if isinstance(v,(int,float)) else f"{labels.get(k,k)}={v}" for k,v in c["conditions"].items()))
         if c.get("prediction"):
-            lines.extend(prediction_lines(c["prediction"], labels))
+            lines.extend(prediction_lines(c["prediction"], labels, template))
     if batch.get("shortfall"): lines.append("\n名额说明：" + batch["shortfall"])
     lines += ["\n提示：" + n for n in batch.get("notices", [])]
     return "\n".join(lines)
 
 
-def prediction_lines(prediction, labels):
+def formatted(value, name, template):
+    field = next((f for f in template.fields if f["name"] == name), {})
+    policy = template.data.get("ratio_policy", {})
+    if name in ("raw_selectivity", "raw_selectivity_abs", policy.get("stable_metric_name")):
+        field = next((f for f in template.fields if f["name"] == policy.get("original_metric")), field)
+    digits = field.get("display_digits")
+    return display(value, digits) if digits is not None else f"{value:.5g}"
+
+
+def prediction_lines(prediction, labels, template):
     lines = []
     for item in prediction.get("objective_predictions", []):
         name = item["definition"]["metric"]
         q = item.get("quantiles")
         if q:
-            lines.append(f"  {labels.get(name, name)}：目标中位数 {q[1]:.5g}，中央 95% 区间 [{q[0]:.5g}, {q[2]:.5g}]")
+            q = [formatted(v, name, template) for v in q]
+            lines.append(f"  {labels.get(name, name)}：目标中位数 {q[1]}，中央 95% 区间 [{q[0]}, {q[2]}]")
     lines.append(f"  预测可行概率：{prediction.get('feasibility_probability', 1):.1%}（不是预测准确率）")
     return lines
 
@@ -66,9 +77,9 @@ def analysis_text(report, template):
         lines.append(f"\n条件 {i}")
         for name, item in prediction.items():
             if not isinstance(item, dict) or not item.get("quantiles"): continue
-            q = item["quantiles"]
+            q = [formatted(v, name, template) for v in item["quantiles"]]
             label = labels.get(name, {"raw_selectivity":"原始刻蚀量比值", "raw_selectivity_abs":"原始比值绝对值", "selectivity_stable":"稳定化比值"}.get(name,name))
-            lines.append(f"{label}：中位数 {q[1]:.5g}，中央 95% 区间 [{q[0]:.5g}, {q[2]:.5g}]")
-        lines.extend(prediction_lines(prediction, labels))
+            lines.append(f"{label}：中位数 {q[1]}，中央 95% 区间 [{q[0]}, {q[2]}]")
+        lines.extend(prediction_lines(prediction, labels, template))
     lines += ["\n提示：" + n for n in report.get("notices", [])]
     return "\n".join(lines)

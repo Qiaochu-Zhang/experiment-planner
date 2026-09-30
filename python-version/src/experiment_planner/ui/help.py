@@ -35,6 +35,10 @@ TOPICS = {
     "fields": ("输入参数与字段名称", "输入参数是实验前可以设定的条件；名称、类型、单位和取值范围由当前模板配置。"),
     "measurements": ("原始测量", "保存实际测量值及不确定度；可选择哪些数值或是否型测量作为模型响应。"),
     "derived_metrics": ("派生指标与公式", "通过已有字段的内部名称编写公式，计算得到新的指标；公式引用、单位和依赖关系会校验。"),
+    "display_precision": ("显示位数与保存机制", "显示位数改变表格和预测文字；数据库、模型及导出保留原数值。"),
+    "history": ("撤销、重做与编号复用", "Ctrl+Z 上一步，Ctrl+Y 下一步；适用于已保存的常见修改，关闭项目或保存推荐批次后清空。"),
+    "import_template": ("下载导入模板与导出预测数据", "按当前模板生成 CSV/Excel 空表；预测页可导出当前图线的完整数值。"),
+    "trend_math": ("趋势图的数学含义", "固定其他输入的统计切片；平坦预测不等于物理无关。"),
     "import": ("导入与结束标记", "按模板输入顺序，前 30% 向上取整的输入全空时停止；该行及之后的行不导入。"),
 
 }
@@ -155,6 +159,8 @@ class HelpFilter(QObject):
                 if item:
                     key = item.data(Qt.ItemDataRole.UserRole)
                     source_rect = QRect(header.sectionViewportPosition(index), 0, header.sectionSize(index), watched.height())
+            if key and key not in TOPICS:
+                return True
             if key:
                 if self.popup: self.popup.close(); self.popup.deleteLater()
                 self.popup = HelpPopup(key, watched.window(), watched.property("helpDescription"), source=watched, source_rect=source_rect)
@@ -169,6 +175,9 @@ class HelpFilter(QObject):
 
 
 def attach_help(widget, key, description=None):
+    if key not in TOPICS:
+        widget.setToolTip("")
+        return widget
     widget.setProperty("helpKey", key)
     if description: widget.setProperty("helpDescription", description)
     widget.setToolTip(TOPICS.get(key, (key, description or "查看详细说明"))[1])

@@ -25,6 +25,7 @@ def analyze(snapshot, request):
         "model": preset,
         "conditions": conditions,
         "notices": notices,
+        "model_datasets": datasets,
         "predictions": prediction_summary(
             model, encoder, names, template, conditions, seed=seed
         ),
@@ -40,4 +41,7 @@ def analyze(snapshot, request):
             request["plot_path"], snapshot["revision"], points=points, seed=seed,
         )
         result["plot_path"] = str(request["plot_path"])
+    for field in template.parameters:
+        if field["name"] == "etch_time_s" and field.get("unit") == "s":
+            result["notices"].append("刻蚀时间输入单位为秒；内置 SiO2 / SiN 刻蚀量响应是累计厚度差（nm），没有除以秒或分钟。趋势是固定其他条件的模型切片，不是物理定律。")
     return result

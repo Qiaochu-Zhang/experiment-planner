@@ -1,7 +1,7 @@
 """Typed condition form shared by prediction and cross-layout controls."""
 import json
 
-from PySide6.QtWidgets import QComboBox, QFormLayout, QLineEdit, QWidget
+from PySide6.QtWidgets import QComboBox, QFormLayout, QLineEdit, QWidget, QLabel
 
 from experiment_planner.domain.template import parse_value
 from experiment_planner.ui.help import attach_help, help_label
@@ -26,9 +26,9 @@ class ConditionsForm(QWidget):
             else:
                 editor=QLineEdit(str(values.get(name,f.get("fixed_value",""))))
                 if "bounds" in f:editor.setPlaceholderText(f"范围 {f['bounds'][0]}–{f['bounds'][1]}")
-            editor.setObjectName(name);attach_help(editor,name,f.get("note") or None)
+            editor.setObjectName(name)
             self.editors[name]=editor
-            self.form.addRow(help_label(f"{f.get('label',name)} ({f.get('unit','1')})",name),editor)
+            self.form.addRow(QLabel(f"{f.get('label',name)} ({f.get('unit','1')})"),editor)
 
     def values(self):
         if not self.template:return {}

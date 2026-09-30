@@ -35,6 +35,8 @@ def plot_slice(model,encoder,names,template,baseline,variables,metric,path,revis
     predictions=prediction_summary(model,encoder,names,template,conditions,seed=seed)
     if metric not in predictions[0]:raise ValidationError("该响应无法预测；剩余厚度预测需要初始条件及专门误差传播")
     figure=Figure(figsize=(9,6),layout="constrained");ax=figure.subplots()
+    if any(not p[metric].get("quantiles") for p in predictions):
+        raise ValidationError("趋势指标没有可用的有限分位数，请检查比值分母和模型数据")
     quantiles=np.array([p[metric]["quantiles"] for p in predictions],dtype=float)
     font=FontProperties(fname=str(files("experiment_planner").joinpath("resources/fonts/NotoSansCJK-Regular.ttc")))
     labels={p["name"]:f"{p.get('label',p['name'])} ({p.get('unit','1')})" for p in template.fields}

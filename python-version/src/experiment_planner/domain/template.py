@@ -82,6 +82,9 @@ class Template:
             raise ValidationError("字段名重复、保留或不合法")
         for field in self.fields:
             unit_dimension(field.get("unit", "1"))
+            digits = field.get("display_digits")
+            if digits is not None and (type(digits) is not int or not -12 <= digits <= 12):
+                raise ValidationError("显示位数必须为 -12 至 12 的整数或原始精度")
             if field.get("value_type", "float") not in ("float", "int", "category", "bool", "text"):
                 raise ValidationError("未知字段类型")
             if field.get("use_as_model_input") and (field.get("measured_at") in ("after", "unknown") or field.get("value_type") == "text"):

@@ -1,13 +1,72 @@
 import copy
 import hashlib
+import uuid
+from functools import wraps
 
 from experiment_planner.application.records import derive, normalize_observations
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.storage.project import Project, encode, now
 
 
+def reversible(method):
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        p = self.project
+        with p.transaction():
+            before = self._state_without_transaction()
+            revision = before["revision"]
+            self._action_revision = revision
+            result = method(self, *args, **kwargs)
+            after = self._state_without_transaction()
+        if revision != self._history_revision:
+            self._undo.clear(); self._redo.clear()
+        if after["revision"] != revision:
+            self._undo.append((before, after))
+            self._undo = self._undo[-50:]
+            self._redo.clear()
+        self._history_revision = after["revision"]
+        return result
+    return wrapped
+
+
 class PlannerService:
-    def __init__(self, project): self.project = project
+    def __init__(self, project):
+        self.project = project
+        self._undo, self._redo = [], []
+        self._history_revision = project.revision
+
+    def _restore(self, state, action):
+        p = self.project
+        with p.transaction(self._history_revision):
+            old = self._state_without_transaction()
+            data = copy.deepcopy(state["template"])
+            current = p.template.data
+            semantic = lambda value: {k: v for k, v in value.items() if k != "template_version"}
+            if semantic(data) != semantic(current):
+                # A restored configuration receives a new version, never an old one.
+                data["template_version"] = current["template_version"] + 1
+                p.db.execute("UPDATE project SET template=? WHERE id=1", (encode(data),))
+            p.db.execute("DELETE FROM experiments")
+            p.db.executemany("INSERT INTO experiments(id,payload,import_key) VALUES(?,?,?)", state["rows"])
+            p.bump()
+            p.log(action, 1, old, self._state_without_transaction())
+        self._history_revision = p.revision
+
+    def _state_without_transaction(self):
+        return {"revision": self.project.revision, "template": self.project.template.data,
+                "rows": [tuple(row) for row in self.project.db.execute("SELECT id,payload,import_key FROM experiments ORDER BY id")]}
+
+    def undo(self):
+        if not self._undo: raise ValidationError("没有可撤销的已保存操作")
+        before, after = self._undo[-1]
+        self._restore(before, "undo")
+        self._undo.pop(); self._redo.append((before, after))
+
+    def redo(self):
+        if not self._redo: raise ValidationError("没有可重做的操作")
+        before, after = self._redo[-1]
+        self._restore(after, "redo")
+        self._redo.pop(); self._undo.append((before, after))
 
     def prepare_record(self, conditions, observations, *, status="completed", note="", field_notes=None, suggested=None):
         if status not in ("pending", "running", "completed", "partial", "failed", "cancelled"):
@@ -16,40 +75,43 @@ class PlannerService:
         actual = t.validate_conditions(conditions, execution=False)
         cells = normalize_observations(t, observations)
         if suggested is not None: t.validate_conditions(suggested)
-        return {"actual": actual, "suggested": suggested, "observations": cells,
+        return {"record_uid": str(uuid.uuid4()), "actual": actual, "suggested": suggested, "observations": cells,
                 "derived": derive(t, actual, cells), "status": status, "note": note,
                 "field_notes": field_notes or {}, "template_version": t.data["template_version"], "updated": now()}
 
+    @reversible
     def add_record(self, conditions, observations, **kwargs):
-        revision=self.project.revision
+        revision=self._action_revision
         record = self.prepare_record(conditions, observations, **kwargs)
         p = self.project
         with p.transaction(revision):
-            cursor = p.db.execute("INSERT INTO experiments(payload) VALUES(?)", (encode(record),))
+            cursor = p.insert_experiment(record)
             p.bump()
             p.log("experiment", cursor.lastrowid, None, record)
         return cursor.lastrowid
 
+    @reversible
     def revise_record(self, experiment_id, conditions, observations, **kwargs):
         p = self.project
-        revision=p.revision
+        revision=self._action_revision
         old = p.experiment(experiment_id)
         new = self.prepare_record(conditions, observations, suggested=old.get("suggested"), **kwargs)
-        for key in ("batch_id", "prediction", "arrangement", "changes", "repeat_of", "baseline_id", "cross_members"):
+        for key in ("record_uid", "repeat_of_uid", "baseline_id_uid", "batch_id", "prediction", "arrangement", "changes", "repeat_of", "baseline_id", "cross_members"):
             if key in old: new[key] = old[key]
         with p.transaction(revision):
             p.db.execute("UPDATE experiments SET payload=? WHERE id=?", (encode(new), experiment_id))
             p.bump()
             p.log("experiment", experiment_id, old, new)
 
+    @reversible
     def delete_records(self, experiment_ids, expected_revision=None):
-        """Remove active records atomically, retaining audit data and stable IDs."""
+        """Remove active records atomically, retaining audit data; inactive numbers can be reused."""
         ids = list(experiment_ids)
         if not ids or any(type(eid) is not int or eid <= 0 for eid in ids):
             raise ValidationError("请选择至少一条有效实验记录")
         ids = list(dict.fromkeys(ids))
         p = self.project
-        with p.transaction(expected_revision):
+        with p.transaction(self._action_revision if expected_revision is None else expected_revision):
             records = [p.experiment(eid) for eid in ids]
             old_template = p.template
             defaults = copy.deepcopy(old_template.data.get("batch_defaults", {}))
@@ -65,7 +127,7 @@ class PlannerService:
                 eid = old["id"]
                 removed = {**old, "deleted_at": now()}
                 removed.pop("id")
-                # Keep the row so SQLite never reuses an audited experiment ID.
+                # Keep deleted payload until this number is reused; audit remains permanent.
                 # Release import identity so the same source can be imported again.
                 p.db.execute("UPDATE experiments SET payload=?, import_key=NULL WHERE id=?", (encode(removed), eid))
                 p.log("experiment_delete", eid, old, removed)
@@ -74,6 +136,7 @@ class PlannerService:
                 p.log("template", 1, old_template.data, revised.data)
         return ids
 
+    @reversible
     def import_records(self, records, expected_revision):
         p = self.project
         prepared = []
@@ -84,23 +147,28 @@ class PlannerService:
             key = hashlib.sha256(encode({"external_id": identity} if identity else item).encode()).hexdigest()
             prepared.append((key, record))
         ids = []
+        if expected_revision != self._action_revision:
+            from experiment_planner.domain.errors import StaleVersionError
+            raise StaleVersionError("项目已修改，请重新预览导入")
         with p.transaction(expected_revision):
             for key, record in prepared:
                 existing = p.db.execute("SELECT id,payload FROM experiments WHERE import_key=?", (key,)).fetchone()
                 if existing:
                     prior = __import__("json").loads(existing[1])
-                    for obj in (prior, record): obj.pop("updated", None)
+                    for obj in (prior, record):
+                        obj.pop("updated", None); obj.pop("record_uid", None); obj.pop("template_version", None)
                     if prior != record: raise ValidationError("同一外部实验编号内容冲突，请使用更正功能")
                     continue
-                cursor = p.db.execute("INSERT INTO experiments(payload,import_key) VALUES(?,?)", (encode(record), key))
+                cursor = p.insert_experiment(record, key)
                 ids.append(cursor.lastrowid)
                 p.bump()
                 p.log("import", cursor.lastrowid, None, record)
         return ids
 
+    @reversible
     def update_template(self, template):
         p = self.project
-        revision=p.revision
+        revision=self._action_revision
         old = p.template
         # Structural edits require a new project; formula/role/goal changes are explicit revisions.
         for section in ("parameters", "measurements"):
@@ -137,8 +205,13 @@ class PlannerService:
                 record.update({"batch_id": bid, "prediction": candidate.get("prediction"), "arrangement": candidate.get("arrangement", "new"), "changes": candidate.get("changes", {})})
                 for name in ("repeat_of","baseline_id","cross_members"):
                     if name in candidate:record[name]=candidate[name]
-                c = p.db.execute("INSERT INTO experiments(payload) VALUES(?)", (encode(record),))
+                for ref in ("repeat_of", "baseline_id"):
+                    if candidate.get(ref) is not None:
+                        record[ref + "_uid"] = p.experiment(candidate[ref]).get("record_uid")
+                c = p.insert_experiment(record)
                 ids.append(c.lastrowid)
             p.bump()
             p.log("batch", bid, None, {"experiment_ids": ids, "source_revision": batch["revision"]})
+        self._undo.clear(); self._redo.clear()
+        self._history_revision = p.revision
         return bid, ids

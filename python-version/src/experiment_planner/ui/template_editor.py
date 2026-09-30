@@ -77,7 +77,7 @@ class TemplateEditor(QDialog):
         for p in self.data["parameters"]:
             row=self.precision.rowCount();self.precision.insertRow(row)
             rule=p.get("execution_rounding",{})
-            label=help_label(f"{p.get('label',p['name'])} ({p.get('unit','1')})",p["name"],p.get("note") or None)
+            label=QLabel(f"{p.get('label',p['name'])} ({p.get('unit','1')})")
             mode=combo([("不限制","none"),("小数位数","digits"),("指定步长","step")],rule.get("mode","none"))
             digits=integer(rule.get("digits") or 0)
             step=number(rule.get("step") or 1,1e-12,1e12,12);origin=number(rule.get("origin",0),decimals=12)
@@ -91,6 +91,16 @@ class TemplateEditor(QDialog):
                 d.setEnabled(allowed and m.currentData()=="digits");s.setEnabled(allowed and m.currentData()=="step");o.setEnabled(allowed and m.currentData()!="none")
             mode.currentIndexChanged.connect(sync);sync(0)
         layout.addWidget(self.precision)
+        layout.addWidget(QLabel("测量和派生指标的显示小数位数（不改变保存和建模数值）"))
+        self.response_display = table(["测量 / 指标", "显示小数位数"])
+        self.response_display_rows = []
+        for field in self.data.get("measurements", []) + self.data.get("derived_metrics", []):
+            row = self.response_display.rowCount(); self.response_display.insertRow(row)
+            editor = combo([("原始精度", None), *[(str(i), i) for i in range(-12, 13)]], field.get("display_digits"))
+            self.response_display.setCellWidget(row, 0, QLabel(field.get("label", field["name"])))
+            self.response_display.setCellWidget(row, 1, editor)
+            self.response_display_rows.append((field["name"], editor))
+        layout.addWidget(self.response_display)
         bulk=QHBoxLayout();layout.addLayout(bulk)
         self.bulk_digits=integer(0);bulk.addWidget(QLabel("所有数值参数统一小数位数"));bulk.addWidget(self.bulk_digits)
         apply=QPushButton("应用到所有工艺参数");apply.clicked.connect(self.apply_digits);bulk.addWidget(apply);bulk.addStretch()
@@ -123,7 +133,7 @@ class TemplateEditor(QDialog):
         for f in fields:
             obj=existing.get(f["name"],{"metric":f["name"],"transform":"identity","direction":"maximize"})
             enabled=QCheckBox();enabled.setChecked(f["name"] in existing)
-            label=help_label(f.get("label",f["name"]),f["name"])
+            label=QLabel(f.get("label",f["name"]))
             transform=combo([("原值","identity"),("绝对值","abs"),("距指定值的距离","absolute_distance")],obj.get("transform","identity"))
             direction=combo([("尽量大","maximize"),("尽量小","minimize")],obj["direction"])
             target=number(obj.get("target",0));target.setEnabled(transform.currentData()=="absolute_distance")
@@ -185,6 +195,9 @@ class TemplateEditor(QDialog):
             p["execution_rounding"]={**p.get("execution_rounding",{}),"mode":selected,"digits":digits.value() if selected=="digits" else None,"step":step.value() if selected=="step" else None}
             if selected!="none":p["execution_rounding"]["origin"]=origin.value()
             p["display_digits"]=display.currentData()
+        all_fields = {f["name"]: f for section in ("measurements", "derived_metrics") for f in data.get(section, [])}
+        for name, editor in self.response_display_rows:
+            all_fields[name]["display_digits"] = editor.currentData()
         data["knowledge_priors"]=[]
         for prior,enabled,inputs,responses,relation,coefficient,strength,source in self.prior_rows:
             data["knowledge_priors"].append({**prior,"enabled":enabled.isChecked(),"input":inputs.currentData(),"response":responses.currentData(),"relation":relation.currentData(),"coefficient":coefficient.value(),"strength":strength.value(),"source":source.text().strip()})

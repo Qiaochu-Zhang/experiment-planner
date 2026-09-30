@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.template import Template
 from experiment_planner.application.template_editing import blank_template
-from experiment_planner.io.exchange import preview_import
+from experiment_planner.io.exchange import preview_import, export_import_template, export_analysis
 from experiment_planner.ui.window import MainWindow, button
 from experiment_planner.ui.template_editor import TemplateEditor
 from experiment_planner.ui.conditions import ConditionsForm
@@ -95,7 +95,7 @@ class PythonWindow(MainWindow):
         layout.addWidget(self.template_view)
         self.tabs.addTab(template_page, "项目与模板")
         utilities=QHBoxLayout();layout.addLayout(utilities)
-        for text,callback in (("导入 CSV / Excel",self.import_data),("导出实验记录",self.export_data),("一致性备份",self.backup)):
+        for text,callback in (("导入 CSV / Excel",self.import_data),("下载导入 CSV / Excel 模板",self.download_import_template),("导出实验记录",self.export_data),("一致性备份",self.backup)):
             button(text,lambda checked=False,f=callback:self.guard(f),utilities)
 
         analysis_page = QWidget()
@@ -118,6 +118,7 @@ class PythonWindow(MainWindow):
         self.analyze_button.clicked.connect(lambda: self.guard(self.start_analysis))
         analysis_layout.addWidget(self.analyze_button)
         button("取消分析", self.cancel_analysis, analysis_layout)
+        button("导出预测 / 图线 Excel 数据", lambda:self.guard(self.export_analysis_data), analysis_layout)
         self.analysis_output = QPlainTextEdit()
         self.analysis_output.setReadOnly(True)
         analysis_layout.addWidget(self.analysis_output)
@@ -127,6 +128,17 @@ class PythonWindow(MainWindow):
         self.tabs.addTab(analysis_page, "预测 / 趋势图")
         button("预测技术详情",lambda:self.guard(lambda:self.show_details(self.analysis_report or {})),analysis_layout)
         self.build_workspace()
+
+    def download_import_template(self):
+        template = self.require_project().template
+        path, _ = QFileDialog.getSaveFileName(self, "保存当前模板的导入空表", "实验导入模板.xlsx", "Excel (*.xlsx);;CSV (*.csv)")
+        if path: export_import_template(template, path)
+
+    def export_analysis_data(self):
+        self.require_project()
+        if not self.analysis_report: raise ValidationError("请先完成预测或趋势图计算")
+        path, _ = QFileDialog.getSaveFileName(self, "导出当前预测 / 图线数据", "预测与趋势数据.xlsx", "Excel (*.xlsx);;CSV (*.csv)")
+        if path: export_analysis(self.analysis_report, self.analysis_template, path)
 
     def batch_request(self):
         request = super().batch_request()
@@ -234,6 +246,8 @@ class PythonWindow(MainWindow):
             if not path:
                 return
             request.update(plot_path=path, variables=variables, metric=self.plot_metric.text().strip())
+        self.analysis_template = project.template
+        self.analysis_report = None
         self.analysis_task = CalculationTask(project, request, operation="analyze")
         self.analyze_button.setEnabled(False)
         self.analysis_output.setPlainText("正在本地拟合与预测；区间表示潜在响应，不包含未知的未来量测误差。")
@@ -254,7 +268,7 @@ class PythonWindow(MainWindow):
             return
         report = result["result"]
         self.analysis_report=report
-        message = analysis_text(report,self.require_project().template)
+        message = analysis_text(report,self.analysis_template)
         if report["revision"] != self.require_project().revision:
             message = "项目已更改：以下分析属于旧数据版本，请重新计算。\n" + message
         self.analysis_output.setPlainText(message)
@@ -349,12 +363,13 @@ class PythonWindow(MainWindow):
             "records":("查看与回填实验",lambda:self.go_to(0),"查看历史、选择待做记录回填"),
             "prediction":("预测与趋势图",lambda:self.go_to(3),"通过参数表单输入条件并预测"),
             "import":("导入 CSV / Excel",self.import_data,"匹配列、校验预览后保存"),
+            "import_template":("下载导入 CSV / Excel 模板",self.download_import_template,"按当前实验模板生成空白导入表"),
             "export":("导出实验记录",self.export_data,"导出完整精度数据"),
             "template":("新建 / 复制 / 修改模板",self.create_template,"从空白、当前模板或本地文件开始"),
             "backup":("备份项目",self.backup,"备份完整数据库和历史"),
         }
         self.preferences=QSettings("ExperimentPlanner","Desktop")
-        stored=self.preferences.value("favorites",["precision","priors","objectives","recommend","record","records","import","prediction"])
+        stored=self.preferences.value("favorites",["precision","priors","objectives","recommend","record","records","import","import_template","prediction"])
         self.favorite_ids=stored if isinstance(stored,list) else [stored]
         self.favorite_ids=list(dict.fromkeys(["precision","priors","objectives",*[k for k in self.favorite_ids if k in self.actions]]))
         # Upgrade existing preferences once; later user removal remains respected.
@@ -381,7 +396,7 @@ class PythonWindow(MainWindow):
             b=QPushButton(title+"\n"+brief);b.setMinimumHeight(92)
             b.setStyleSheet("text-align:left;padding:16px;background:white;border:1px solid #d7e2ee;border-radius:9px;font-size:14px;")
             b.clicked.connect(lambda checked=False,f=callback:self.guard(f))
-            attach_help(b,key if key in ("precision","priors","objectives","prediction","template","import") else "overview")
+            attach_help(b,key if key in ("precision","priors","objectives","prediction","template","import","import_template") else "overview")
             self.favorite_grid.addWidget(b,i//3,i%3)
 
     def customize_favorites(self):

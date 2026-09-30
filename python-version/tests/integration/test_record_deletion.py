@@ -28,7 +28,7 @@ def test_delete_is_atomic_and_rejects_stale_confirmation(service, conditions, me
     with pytest.raises(ValidationError, match="已删除"): service.revise_record(eid, conditions, measurements)
 
 
-def test_delete_preserves_audit_batches_ids_and_backup(service, conditions, measurements, tmp_path):
+def test_delete_preserves_audit_batches_and_reuses_ids_after_backup(service, conditions, measurements, tmp_path):
     p = service.project
     first = service.add_record(conditions, measurements)
     batch = {"revision": p.revision, "request": {"n": 1}, "candidates": [{"conditions": conditions, "repeat_of": first}]}
@@ -51,14 +51,14 @@ def test_delete_preserves_audit_batches_ids_and_backup(service, conditions, meas
     assert json.loads(events[0]["old_payload"])["observations"] == original["observations"]
     assert json.loads(events[0]["new_payload"])["deleted_at"]
     replacement = service.add_record(conditions, measurements)
-    assert replacement > max(first, *pending)
+    assert replacement == first
     p.backup(tmp_path / "deleted.sqlite")
     with Project(tmp_path / "deleted.sqlite") as restored:
         assert restored.db.execute("PRAGMA user_version").fetchone()[0] == 2
         assert restored.snapshot() == p.snapshot()
         assert restored.history() == p.history()
         assert restored.batches() == batches
-        with pytest.raises(ValidationError, match="已删除"): restored.experiment(first)
+        assert restored.experiment(first)["record_uid"] != original["record_uid"]
 
 
 def test_failure_during_delete_rolls_back_records_audit_and_format(service, conditions, measurements, monkeypatch):
@@ -76,13 +76,13 @@ def test_failure_during_delete_rolls_back_records_audit_and_format(service, cond
 
 
 @pytest.mark.parametrize("external_id", [None, "run-1"])
-def test_deleted_import_can_be_imported_again_with_new_id(service, conditions, measurements, external_id):
+def test_deleted_import_can_be_imported_again_reusing_id(service, conditions, measurements, external_id):
     p = service.project
     row = {"conditions": conditions, "observations": measurements, "external_id": external_id}
     [first] = service.import_records([row], p.revision)
     service.delete_records([first])
     [second] = service.import_records([row], p.revision)
-    assert second > first
+    assert second == first
     assert service.import_records([row], p.revision) == []
     assert [e["id"] for e in p.experiments()] == [second]
 
