@@ -1,7 +1,7 @@
 """Typed condition form shared by prediction and cross-layout controls."""
 import json
 
-from PySide6.QtWidgets import QComboBox, QFormLayout, QLineEdit, QWidget, QLabel
+from PySide6.QtWidgets import QComboBox, QFormLayout, QLayout, QLineEdit, QWidget, QLabel
 
 from experiment_planner.domain.template import parse_value
 from experiment_planner.ui.help import attach_help, help_label
@@ -11,6 +11,9 @@ class ConditionsForm(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.form=QFormLayout(self);self.editors={};self.template=None
+        self.form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        self.form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        self.form.setSizeConstraint(QLayout.SizeConstraint.SetMinAndMaxSize)
 
     def set_template(self,template):
         old=self.toPlainText()
@@ -28,7 +31,9 @@ class ConditionsForm(QWidget):
                 if "bounds" in f:editor.setPlaceholderText(f"范围 {f['bounds'][0]}–{f['bounds'][1]}")
             editor.setObjectName(name)
             self.editors[name]=editor
-            self.form.addRow(QLabel(f"{f.get('label',name)} ({f.get('unit','1')})"),editor)
+            label = QLabel(f"{f.get('label',name)} ({f.get('unit','1')})")
+            label.setWordWrap(True)
+            self.form.addRow(label,editor)
 
     def values(self):
         if not self.template:return {}

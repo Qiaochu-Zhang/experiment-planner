@@ -11,6 +11,10 @@ FIRST_DATA_ROW = 3
 LAST_DATA_ROW = 10002
 
 
+def boolean_text(value):
+    return "是" if value is True else "否" if value is False else value
+
+
 def has_hint_row(values):
     return bool(values) and str(values[0] or "").startswith(HINT_PREFIX)
 
@@ -95,9 +99,9 @@ def value_hint(field, required=False, *, limits=True):
     kind = field.get("value_type", "float")
     label = field.get("label", field["name"])
     hint = f"{'必填' if required else '选填'}：{label}；单位 {field.get('unit', '1')}。"
-    if (limits or kind == "category") and "fixed_value" in field: hint += f"只能填 {field['fixed_value']}。"
+    if (limits or kind == "category") and "fixed_value" in field: hint += f"只能填 {boolean_text(field['fixed_value'])}。"
     elif (limits or kind == "category") and "values" in field: hint += "从下拉选择限定值。"
-    elif kind == "bool": hint += "从下拉选择 true / false（是 / 否）。"
+    elif kind == "bool": hint += "从下拉选择是 / 否。"
     elif kind in ("float", "int"):
         hint += "整数。" if kind == "int" else "数值。"
         if limits and "bounds" in field:
@@ -114,10 +118,12 @@ def add_value_validation(guide, sheet, index, field, hint, *, limits=True):
         values = [field["fixed_value"]]
     elif (limits or kind == "category") and "values" in field:
         values = field["values"]
-    elif kind == "bool": values = ["true", "false", "是", "否"]
+    elif kind == "bool": values = [True, False]
     else: values = None
     if values is not None:
-        if kind == "bool": values = [str(v).lower() if type(v) is bool else v for v in values]
+        if kind == "bool":
+            from experiment_planner.domain.template import parse_value
+            values = [boolean_text(parse_value(v, field)) for v in values]
         guide.dropdown(sheet, cells, values, hint)
     elif kind in ("float", "int"):
         bounds = field.get("bounds", [None, None]) if limits else [None, None]

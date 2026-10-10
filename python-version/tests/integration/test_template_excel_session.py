@@ -166,3 +166,47 @@ def test_failed_atomic_save_keeps_original_and_dirty_session(tmp_path, monkeypat
         assert session.dirty and file.read_bytes() == before
         assert len(session.experiments()) == 1
     assert not list(tmp_path.glob('.project-save-*'))
+
+
+@pytest.mark.parametrize('creating', [False, True])
+def test_save_syncs_a_writable_descriptor_and_can_save_again(tmp_path, monkeypatch, creating):
+    import experiment_planner.storage.session as session_module
+    file = tmp_path / '描述符保存.sqlite'
+    if not creating:
+        with Project.create(file, '保存', small_template(False)): pass
+    original_fsync = session_module.os.fsync
+    calls = []
+    def require_writable(fd):
+        # A zero-byte write changes no data, but reproduces EBADF for a read-only
+        # descriptor on every test platform, as Windows _commit can reject it.
+        session_module.os.write(fd, b'')
+        calls.append(fd)
+        original_fsync(fd)
+    monkeypatch.setattr(session_module.os, 'fsync', require_writable)
+    with ProjectSession(file, template=small_template(False), creating=creating) as session:
+        service = PlannerService(session)
+        for speed in (1, 2):
+            service.add_record({'speed': speed}, {'quality': speed * 2})
+            session.save()
+            assert not session.dirty
+            with Project(file) as saved: assert len(saved.experiments()) == speed
+    assert len(calls) == 2 and not list(tmp_path.glob('.project-save-*'))
+
+
+def test_sync_failure_preserves_existing_file_and_allows_retry(tmp_path, monkeypatch):
+    import experiment_planner.storage.session as session_module
+    file = tmp_path / '同步失败.sqlite'
+    with Project.create(file, '同步', small_template(False)): pass
+    before = file.read_bytes()
+    original_fsync = session_module.os.fsync
+    def fail(fd): raise OSError(9, 'Bad file descriptor')
+    with ProjectSession(file) as session:
+        PlannerService(session).add_record({'speed': 1}, {'quality': 3})
+        monkeypatch.setattr(session_module.os, 'fsync', fail)
+        with pytest.raises(OSError, match='Bad file descriptor'): session.save()
+        assert session.dirty and file.read_bytes() == before
+        assert not list(tmp_path.glob('.project-save-*'))
+        monkeypatch.setattr(session_module.os, 'fsync', original_fsync)
+        session.save()
+        assert not session.dirty
+    with Project(file) as saved: assert len(saved.experiments()) == 1

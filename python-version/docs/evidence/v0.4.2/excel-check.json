@@ -1,0 +1,85 @@
+{
+  "version": "0.4.2",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "definition_roundtrip": "passed",
+  "legacy_csv_and_guided_excel_equal": "passed",
+  "blank_record_template": "passed",
+  "artifacts": [
+    {
+      "file": "examples/import_templates/实验记录导入模板.xlsx",
+      "sheets": [
+        "导入数据",
+        "_填写选项",
+        "填写说明"
+      ],
+      "validations": 37,
+      "hint_rows": [
+        "导入数据"
+      ]
+    },
+    {
+      "file": "examples/import_templates/实验记录填写示例_合成数据.xlsx",
+      "sheets": [
+        "导入数据",
+        "_填写选项",
+        "填写说明"
+      ],
+      "validations": 37,
+      "hint_rows": [
+        "导入数据"
+      ]
+    },
+    {
+      "file": "examples/template_definitions/空白模板定义.xlsx",
+      "sheets": [
+        "填写说明",
+        "输入参数",
+        "_填写选项",
+        "原始测量",
+        "派生指标与公式",
+        "优化目标",
+        "先验关系",
+        "输入约束",
+        "输出约束",
+        "模板设置"
+      ],
+      "validations": 53,
+      "hint_rows": [
+        "输入参数",
+        "原始测量",
+        "派生指标与公式",
+        "优化目标",
+        "先验关系",
+        "输入约束",
+        "输出约束",
+        "模板设置"
+      ]
+    },
+    {
+      "file": "examples/template_definitions/模板定义示例.xlsx",
+      "sheets": [
+        "填写说明",
+        "输入参数",
+        "_填写选项",
+        "原始测量",
+        "派生指标与公式",
+        "优化目标",
+        "先验关系",
+        "输入约束",
+        "输出约束",
+        "模板设置"
+      ],
+      "validations": 53,
+      "hint_rows": [
+        "输入参数",
+        "原始测量",
+        "派生指标与公式",
+        "优化目标",
+        "先验关系",
+        "输入约束",
+        "输出约束",
+        "模板设置"
+      ]
+    }
+  ]
+}

@@ -42,6 +42,7 @@ def integer(value=0,minimum=-12,maximum=12):
 def table(headers):
     result=QTableWidget(0,len(headers));result.setHorizontalHeaderLabels(headers)
     result.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+    result.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
     result.horizontalHeader().setStretchLastSection(True);result.setAlternatingRowColors(True)
     return result
 

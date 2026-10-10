@@ -1,0 +1,57 @@
+{
+  "version": "0.4.2",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "window_states": [
+    {
+      "state": "normal",
+      "size": [
+        1280,
+        820
+      ],
+      "labels": "passed",
+      "copied_values": "preserved",
+      "image": "prediction-normal.png"
+    },
+    {
+      "state": "small",
+      "size": [
+        1024,
+        650
+      ],
+      "labels": "passed",
+      "copied_values": "preserved",
+      "image": "prediction-small.png"
+    },
+    {
+      "state": "maximized",
+      "size": [
+        796,
+        796
+      ],
+      "labels": "passed",
+      "copied_values": "preserved",
+      "image": "prediction-maximized.png"
+    },
+    {
+      "state": "fullscreen",
+      "size": [
+        800,
+        800
+      ],
+      "labels": "passed",
+      "copied_values": "preserved",
+      "image": "prediction-fullscreen.png"
+    },
+    {
+      "state": "restored",
+      "size": [
+        1100,
+        720
+      ],
+      "labels": "passed",
+      "copied_values": "preserved",
+      "image": "prediction-restored.png"
+    }
+  ],
+  "font150_prediction_and_template": "passed"
+}

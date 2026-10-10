@@ -51,7 +51,9 @@ class ProjectSession(Project):
             try:
                 temporary.unlink()
                 self.backup(temporary)
-                with temporary.open("rb") as source: os.fsync(source.fileno())
+                # Windows _commit (used by fsync) needs a writable descriptor.
+                # r+b preserves the completed SQLite backup without truncation.
+                with temporary.open("r+b") as source: os.fsync(source.fileno())
                 os.replace(temporary, self.target_path)
             finally:
                 temporary.unlink(missing_ok=True)

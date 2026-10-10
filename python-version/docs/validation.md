@@ -1,5 +1,30 @@
 # Python 源码版验证报告
 
+## 0.4.2 · 2026-10-10
+
+在 Linux / CPython 3.12.3 / PySide6 6.11.2 / Qt offscreen 环境验证中文布尔选项、项目保存修复与窗口布局；仅修改 `python-version`。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| 完整回归 | **223 项通过，0 失败，0 跳过，退出码 0**，277.76 秒；14 条依赖弃用/数值提示。[日志](evidence/v0.4.2/python312-tests.txt)、[JUnit](evidence/v0.4.2/python312-tests.xml)。 |
+| 项目保存 | 对只读描述符进行零字节写入以模拟 Windows 同步限制，修改前新建/已存在项目均复现 Errno 9；修改后通过。完整回归覆盖连续保存、同步故障不覆盖原文件、保留待保存状态、重试及原有另存/关闭保存行为。 |
+| Excel 文件 | 布尔类型仅“是否”、开关和布尔值仅“是/否”，旧英文布尔读回兼容，固定/离散布尔限制保留；上下端点实际导入通过，相同上下限被拒绝。四份示例重新生成，公式读回及与旧 CSV 的数据一致检查通过。[检查记录](evidence/v0.4.2/excel-check.json)、[复现脚本](../scripts/validate_excel_guidance.py)。 |
+| 窗口布局 | 11 项 GUI 回归覆盖普通、1024×650 小窗口、最大化、全屏、恢复；从选中实验复制条件后检查 28 个输入、长名称、900×600 大图，校验无标签重叠/高度不足、末项和分析控件可滚动访问。完整回归后加强字体检查，确认标签实际使用 1.5/2 倍字号，最终 11 项再次通过，退出码 0。[最终日志](evidence/v0.4.2/layout-tests.txt)、[JUnit](evidence/v0.4.2/layout-tests.xml)、[布局检查](evidence/v0.4.2/layout-check.json)、[截图复现脚本](../scripts/validate_window_layout.py)。 |
+| 桌面启动 | `main.py --smoke` 正常退出，退出码 0。[日志](evidence/v0.4.2/smoke.txt)。 |
+| 安装包 | 0.4.2 wheel 构建成功，全部 57 个包内源码/资源与当前文件逐字节一致。[检查记录](evidence/v0.4.2/wheel-check.json)、[构建日志](evidence/v0.4.2/wheel-build.txt)。 |
+
+布局截图：[普通窗口](evidence/v0.4.2/prediction-normal.png)、[小窗口](evidence/v0.4.2/prediction-small.png)、[最大化](evidence/v0.4.2/prediction-maximized.png)、[全屏](evidence/v0.4.2/prediction-fullscreen.png)、[恢复](evidence/v0.4.2/prediction-restored.png)、[预测页 1.5 倍字体](evidence/v0.4.2/prediction-font150.png)、[模板编辑 1.5 倍字体](evidence/v0.4.2/template-font150.png)。离屏虚拟屏幕为 800×800，窗口最大化可用尺寸为 796×796；普通及恢复状态使用指定窗口尺寸。
+
+保存故障验证模拟只读描述符限制，并非在用户 Windows 机器执行。窗口覆盖上述状态和字体，未逐一验证所有操作系统、分辨率及任意文字长度；内容超出可见区域时需要滚动，长输入值可在输入框内移动光标查看。本轮不包含 Microsoft Excel 人工操作、Python 3.13 或真实机台实验。环境及总结果见 [总记录](evidence/v0.4.2/summary.json)，问答见 [回答.md](../回答.md) 第 32–37 节。
+
+复现：
+
+```bash
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q -p no:cacheprovider
+python scripts/validate_excel_guidance.py
+QT_QPA_PLATFORM=offscreen python scripts/validate_window_layout.py
+```
+
 ## 0.4.1 · 2026-10-10
 
 在 Linux / CPython 3.12.3 / PySide6 6.11.2 / Qt offscreen 环境验证，新增两类 Excel 的填写提示、限定选项下拉及范围校验；仅修改 `python-version`。

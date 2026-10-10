@@ -76,9 +76,9 @@ def test_exported_record_template_has_required_range_hints_and_reusable_dropdown
         assert options_at(workbook, sheet, f"{headers['constant']}3") == ['3.5']
         assert options_at(workbook, sheet, f"{headers['level']}3") == ['1', '2', '4']
         assert options_at(workbook, sheet, f"{headers['sample']}3") == ['批次甲', '批次乙']
-        assert 'true' in options_at(workbook, sheet, f"{headers['switch']}3")
+        assert options_at(workbook, sheet, f"{headers['switch']}3") == ['是', '否']
         assert options_at(workbook, sheet, f"{headers['grade']}3") == ['合格', '待复测']
-        assert 'false' in options_at(workbook, sheet, f"{headers['approved']}3")
+        assert options_at(workbook, sheet, f"{headers['approved']}3") == ['是', '否']
         assert options_at(workbook, sheet, f"{headers['approved_uncertainty_kind']}3") == ['unspecified']
         assert options_at(workbook, sheet, f"{headers['grade_uncertainty_kind']}3") == ['unspecified']
         assert options_at(workbook, sheet, f"{headers['quality_unit']}3") == ['kg']
@@ -141,7 +141,7 @@ def test_definition_dropdowns_settings_notes_and_editable_units_roundtrip(tmp_pa
         parameters = workbook['输入参数']; assert parameters['A2'].value == '内部名称'
         assert '必填' in parameters['A1'].value and '-12' in parameters['O1'].value
         assert '文字' in options_at(workbook, parameters, 'C3')
-        assert '是' in options_at(workbook, parameters, 'J3')
+        assert options_at(workbook, parameters, 'J3') == ['是', '否']
         assert '指定步长' in options_at(workbook, parameters, 'P3')
         assert options_at(workbook, workbook['优化目标'], 'B3') == ['maximize', 'minimize', '尽量大', '尽量小']
         assert options_at(workbook, workbook['输入约束'], 'B3') == ['<=', '>=']
@@ -156,7 +156,8 @@ def test_definition_dropdowns_settings_notes_and_editable_units_roundtrip(tmp_pa
         assert 'gp_matern25_v1' in options_at(workbook, settings, f'B{model_row}')
         settings.cell(model_row, 2, 'gp_matern25_v1')
         settings.cell(rows['custom_bool'], 2, '否')
-        assert options_at(workbook, settings, 'C10002') == ['str', 'int', 'float', 'bool', 'list', 'dict', 'null']
+        assert options_at(workbook, settings, f"B{rows['custom_bool']}") == ['是', '否']
+        assert options_at(workbook, settings, 'C10002') == ['str', 'int', 'float', '是否', 'list', 'dict', 'null']
         # Unit is free text: there must be no enum restricting this cell.
         assert not any('D3' in v for v in parameters.data_validations.dataValidation)
         parameters['D3'] = '自定义流量'
@@ -203,3 +204,51 @@ def test_old_experiment_metadata_does_not_select_models_or_inputs():
         assert Encoder(template).width == 1
         _, encoder, names, _, _ = fit_models(template, records, 'bayesian_linear_v1')
         assert names == ['quality'] and encoder.width == 1
+
+
+def test_boolean_excel_uses_only_chinese_choices_and_reads_old_english(tmp_path):
+    data = varied_template().data
+    data['parameters'][3]['fixed_value'] = True
+    data['parameters'].append({'name': 'bool_values', 'value_type': 'bool', 'values': [True, False]})
+    data['custom_bool'] = False
+    template = Template(data); path = tmp_path / '中文布尔.xlsx'; template.write(path)
+    workbook = load_workbook(path)
+    sheet = workbook['输入参数']
+    assert sheet['C6'].value == '是否' and sheet['I6'].value == '是'
+    assert sheet['H10'].value == '["是", "否"]'
+    types = options_at(workbook, sheet, 'C6')
+    assert '是否' in types and 'bool' not in types
+    for title, coordinate in [('输入参数', 'J3'), ('原始测量', 'K3'), ('先验关系', 'A3')]:
+        assert options_at(workbook, workbook[title], coordinate) == ['是', '否']
+    settings = workbook['模板设置']
+    row = next(row for row in settings.iter_rows(min_row=3) if row[0].value == 'custom_bool')
+    assert row[1].value == '否' and row[2].value == '是否'
+    assert Template.read(path).parameters[3]['fixed_value'] is True
+    assert Template.read(path).parameters[-1]['values'] == [True, False]
+    # Old boolean spellings stay readable, although new dropdowns omit them.
+    sheet['C6'] = 'bool'; sheet['I6'] = 'true'; sheet['H10'] = '[true,false]'
+    row[1].value = 'false'; row[2].value = 'bool'
+    workbook.save(path); workbook.close()
+    restored = Template.read(path)
+    assert restored.parameters[3]['fixed_value'] is True and restored.data['custom_bool'] is False
+    assert restored.parameters[-1]['values'] == [True, False]
+    export_import_template(template, path)
+    workbook = load_workbook(path); sheet = workbook.active
+    columns = {c.value: c.column_letter for c in sheet[2]}
+    assert options_at(workbook, sheet, f"{columns['switch']}3") == ['是']
+    assert options_at(workbook, sheet, f"{columns['bool_values']}3") == ['是', '否']
+    workbook.close()
+
+
+@pytest.mark.parametrize('value', [0, 10])
+def test_input_bounds_include_both_endpoints(tmp_path, value):
+    template = varied_template(); path = tmp_path / '边界.xlsx'
+    export_import_template(template, path)
+    workbook = load_workbook(path)
+    append_record(workbook.active, {**record_values(), 'speed': value})
+    workbook.save(path); workbook.close()
+    with Project.create(tmp_path / 'closed.sqlite', '闭区间', template) as project:
+        preview = preview_import(PlannerService(project), path)
+        assert not preview.errors and preview.records[0]['conditions']['speed'] == value
+    data = template.data; data['parameters'][0]['bounds'] = [value, value]
+    with pytest.raises(ValidationError, match='范围无效'): Template(data)

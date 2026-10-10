@@ -29,7 +29,7 @@ from experiment_planner.io.template_excel import read_template_draft
 class PythonWindow(MainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("实验规划助手 · 0.4.1 · Python 3.12 / 3.13")
+        self.setWindowTitle("实验规划助手 · 0.4.2 · Python 3.12 / 3.13")
         self.loaded_template_key = None
         self.analysis_report = None
         self.summary.setText("新建或打开本地项目，录入实验后规划下一批条件。")
@@ -105,10 +105,10 @@ class PythonWindow(MainWindow):
         analysis_page = QWidget()
         analysis_layout = QVBoxLayout(analysis_page)
         self.conditions = ConditionsForm()
-        condition_scroll=QScrollArea();condition_scroll.setWidgetResizable(True);condition_scroll.setWidget(self.conditions)
-        condition_scroll.setMinimumHeight(190)
+        self.condition_scroll=QScrollArea();self.condition_scroll.setWidgetResizable(True);self.condition_scroll.setWidget(self.conditions)
+        self.condition_scroll.setMinimumHeight(190)
         button("从选中实验复制条件", lambda: self.guard(self.copy_conditions), analysis_layout)
-        analysis_layout.addWidget(condition_scroll)
+        analysis_layout.addWidget(self.condition_scroll)
         settings = QFormLayout()
         analysis_layout.addLayout(settings)
         self.plot_variables = QLineEdit()
@@ -457,11 +457,13 @@ class PythonWindow(MainWindow):
             self.preferences.setValue("import_favorite_initialized",True)
             self.preferences.sync()
         self.render_favorites()
-        self.navigation.addTab(home,"常用功能");self.navigation.addTab(self.tabs,"更多功能")
+        home_scroll=QScrollArea();home_scroll.setWidgetResizable(True);home_scroll.setWidget(home)
+        self.navigation.addTab(home_scroll,"常用功能");self.navigation.addTab(self.tabs,"更多功能")
         self.navigation.setCurrentIndex(0)
         self.setStyleSheet(self.styleSheet()+" QTabBar::tab {padding:10px 18px;} QGroupBox {font-weight:bold;} QPushButton {min-height:24px;} QHeaderView::section {background:#e9eef7;padding:7px;border:1px solid #d4deed;}")
-        # Keep long recommendation forms usable on smaller screens.
-        for i in (1,2):
+        # Keep every long form, including prediction and plots, scrollable when
+        # the window or available screen is smaller than its content.
+        for i in (1,2,3):
             page=self.tabs.widget(i);title=self.tabs.tabText(i)
             self.tabs.removeTab(i);scroll=QScrollArea();scroll.setWidgetResizable(True);scroll.setWidget(page);self.tabs.insertTab(i,scroll,title)
 
