@@ -1,5 +1,27 @@
 # Python 源码版验证报告
 
+## 0.4.1 · 2026-10-10
+
+在 Linux / CPython 3.12.3 / PySide6 6.11.2 / Qt offscreen 环境验证，新增两类 Excel 的填写提示、限定选项下拉及范围校验；仅修改 `python-version`。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| 完整回归 | **206 项通过，0 失败，0 跳过，退出码 0**，161.19 秒；14 条依赖弃用/数值提示。[日志](evidence/v0.4.1/python312-tests.txt)、[JUnit](evidence/v0.4.1/python312-tests.xml)。 |
+| Excel 文件 | 四份示例重新生成，模板定义读回公式正确；新版 Excel 合成导入与旧 CSV 的条件、测量、不确定度一致，空表导入为 0 条。[检查记录](evidence/v0.4.1/excel-check.json)、[复现脚本](../scripts/validate_excel_guidance.py)。 |
+| 桌面启动 | `main.py --smoke` 正常退出，退出码 0。[日志](evidence/v0.4.1/smoke.txt)。 |
+| 安装包 | 0.4.1 wheel 构建成功，全部 57 个包内源码/资源与当前文件逐字节一致，含新增 Excel 公共模块。[检查记录](evidence/v0.4.1/wheel-check.json)。 |
+
+新增 13 项回归覆盖：填写提示/批注与实际范围、固定/离散/类别/是否下拉、测量单位和误差列、长文字/逗号/字面等号选项、整数与严格数值边界、粘贴非法值后由软件拒绝且不写记录、实际值不受推荐执行网格限制、带提示格式的实际错误/停止行、模板设置模式/模型与类型、自由单位编辑、空白模板第 3 行填写，以及保留旧基础响应/场景假设元数据时实际模型仍使用新字段。原有手写首行列名 Excel、CSV、GUI、模型和显式保存测试均保留。
+
+本轮验证导出文件的数据验证定义及实际读写/导入，不包含 Microsoft Excel/Windows 人工操作、Python 3.13 或真实机台实验。Excel 数据验证可被粘贴绕过；软件校验为准。隐藏的命名选项表避免直接列表的长度与逗号限制；校验覆盖 10000 条。更换模板设置属性路径后，原行附带的 Excel 下拉仍对应导出时的属性。环境、退出码和示例总记录见 [总记录](evidence/v0.4.1/summary.json)。
+
+复现：
+
+```bash
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 .venv/bin/python -m pytest -c python-version/pyproject.toml python-version/tests -q -p no:cacheprovider
+.venv/bin/python python-version/scripts/validate_excel_guidance.py
+```
+
 ## 0.4.0 · 2026-10-10
 
 在 Linux / CPython 3.12.3 / Qt offscreen 环境验证。新增 Excel 模板定义、批量字段、文字输入、三个精度批量操作及桌面显式保存；仅修改 `python-version`。

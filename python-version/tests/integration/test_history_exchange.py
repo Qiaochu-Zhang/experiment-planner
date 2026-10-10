@@ -103,7 +103,7 @@ def test_current_template_empty_import_file_can_be_filled(service, conditions, m
     if extension == "xlsx":
         wb = load_workbook(path)
         assert wb.active.title == "导入数据" and "填写说明" in wb.sheetnames
-        headers = [cell.value for cell in wb.active[1]]
+        headers = [cell.value for cell in wb.active[2]]
         wb.active.append([({"external_id": "external-1", **conditions, **measurements}).get(key) for key in headers])
         wb.save(path); wb.close()
     else:

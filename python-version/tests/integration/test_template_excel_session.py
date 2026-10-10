@@ -35,7 +35,7 @@ def test_excel_export_import_keeps_formulas_types_settings_and_literal_text(tmp_
     file = tmp_path / '模板.xlsx'
     Template(data).write(file)
     workbook = load_workbook(file)
-    assert workbook['输入参数']['E2'].data_type == 's'
+    assert workbook['输入参数']['E3'].data_type == 's'
     workbook.close()
     restored = Template.read(file)
     assert restored.data['name'] == '123' and restored.data['custom'] == data['custom']
@@ -69,8 +69,8 @@ def test_excel_errors_include_sheet_and_row_and_drafts_can_be_incomplete(tmp_pat
     file = tmp_path / '草稿.xlsx'; write_template_excel(data, file)
     assert read_template_excel(file)['parameters'][0]['name'] == 'speed'
     with pytest.raises(ValidationError): Template.read(file)
-    workbook = load_workbook(file); workbook['输入参数']['F2'] = '错误范围'; workbook.save(file); workbook.close()
-    with pytest.raises(ValidationError, match='输入参数 第 2 行'): read_template_excel(file)
+    workbook = load_workbook(file); workbook['输入参数']['F3'] = '错误范围'; workbook.save(file); workbook.close()
+    with pytest.raises(ValidationError, match='输入参数 第 3 行'): read_template_excel(file)
 
 
 def test_excel_roundtrip_does_not_change_implicit_model_roles(tmp_path):

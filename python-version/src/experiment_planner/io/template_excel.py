@@ -3,10 +3,12 @@ import json
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Alignment
+from openpyxl.comments import Comment
 
 from experiment_planner.application.template_editing import blank_template, normalize_draft
 from experiment_planner.domain.errors import ValidationError
+from experiment_planner.io.excel_guidance import ExcelGuide, add_column_hints, column_cells, header_row
 
 
 FIELD_COLUMNS = [
@@ -39,6 +41,104 @@ BOOL_KEYS = {"use_as_model_input", "is_response", "model_base", "enabled"}
 INT_KEYS = {"display_digits", "execution_digits", "schema_version", "template_version"}
 NUMBER_KEYS = {"lower", "upper", "execution_step", "execution_origin", "target", "coefficient", "strength", "rhs", "bound"}
 
+CHOICES = {
+    "value_type": ["float", "int", "category", "bool", "text", "数值", "整数", "类别", "是否", "文字"],
+    "measured_at": ["before", "after", "unknown", "实验前", "实验后", "未指定"],
+    "execution_mode": ["none", "digits", "step", "不限制", "小数位数", "指定步长"],
+    "direction": ["maximize", "minimize", "尽量大", "尽量小"],
+    "transform": ["identity", "abs", "absolute_distance", "原值", "绝对值", "距指定值的距离"],
+    "relation": ["independent", "linear", "proportional", "monotonic", "weak"],
+    "op": ["<=", ">="],
+    **{key: ["true", "false", "是", "否"] for key in BOOL_KEYS},
+}
+
+
+def _column_hint(section, key):
+    hints = {
+        "name": "必填：英文字母开头，仅字母、数字、下划线；所有字段表不得重名。",
+        "label": "选填：显示名称；留空使用内部名称。", "unit": "选填：自由输入单位；留空为 1（无量纲），不自动换算自定义单位。",
+        "value_type": "选填：下拉选 float 数值 / int 整数 / category 类别 / bool 是否 / text 文字；留空为 float。",
+        "note": "选填：字段说明。", "lower": "条件必填：用范围定义数值输入时，下限和上限都要填，且下限 < 上限。范围、离散值、固定值三选一。",
+        "upper": "条件必填：范围输入的上限；必须大于下限。无范围时留空。",
+        "values": '条件必填：类别输入需要离散值或固定值；填写 JSON 数组，例如 ["甲","乙"] 或 [1,2,3]。',
+        "fixed_value": "选填：固定输入只填该值，不再填范围或离散值；按字段类型填写。",
+        "use_as_model_input": "选填：true/是 或 false/否。文字不能作为数值模型输入；事后或未知测量不能作为未来输入。",
+        "is_response": "选填：作为响应？原始测量/派生指标的数值字段手写留空默认是；文字/类别不作数值响应。",
+        "model_base": "选填：直接建模？原始测量手写留空默认是；派生指标留空默认否。至少一个响应需直接建模。",
+        "measured_at": "选填：测量时点 before/实验前、after/实验后、unknown/未指定。手写原始测量留空默认 after。",
+        "expression": "必填（派生指标）：用内部名称写公式，例如 quality * 2。其他字段留空。",
+        "display_digits": "选填：整数范围 -12 ≤ 位数 ≤ 12；空白为原始精度，仅改变显示。",
+        "execution_mode": "选填：none 不限制、digits 小数位数、step 步长。仅数值输入使用；空白默认 none。",
+        "execution_digits": "条件必填：digits 模式填整数，-12 ≤ 位数 ≤ 12；不用时留空。",
+        "execution_step": "条件必填：step 模式的步长，数值 > 0。",
+        "execution_origin": "选填：step 网格起点，任意有限数值；留空为 0。",
+        "extra": "选填：扩展属性 JSON 对象；不清楚可留空。",
+        "metric": "必填：已有响应或派生指标的内部名称。", "direction": "选填：maximize 尽量大、minimize 尽量小；留空为 maximize。",
+        "transform": "选填：identity 原值、abs 绝对值、absolute_distance 距指定值的距离；留空为 identity。",
+        "target": "条件必填：变换为 absolute_distance 时的目标值；任意有限数值。",
+        "enabled": "选填：true/是 启用、false/否 不启用；留空默认启用。",
+        "input": "启用时必填：数值模型输入的内部名称。", "response": "启用时必填：直接建模基础响应的内部名称。",
+        "relation": "启用时必填：independent 独立、linear 线性、proportional 比例、monotonic 单调、weak 弱先验。",
+        "coefficient": "条件必填：启用非 independent/weak 关系时填有符号系数；任意有限数值，单位为响应单位/输入单位。",
+        "strength": "条件必填：启用非 independent 关系时的强度，数值 > 0。",
+        "source": "启用时必填：经验或文献依据。", "coefficients": '必填：非空 JSON 系数组，例如 {"speed":1}；内部名称须是数值输入。',
+        "op": "必填：从下拉选 <=（不超过）或 >=（不低于）。",
+        "rhs": "必填：输入约束阈值，任意有限数值。", "bound": "必填：输出约束阈值，任意有限数值。",
+    }
+    if section != "derived_metrics" and key == "expression": return "留空：本区域不填写派生公式。"
+    if section != "parameters" and key in {"lower", "upper", "values", "fixed_value", "execution_mode", "execution_digits", "execution_step", "execution_origin"}:
+        if key == "values": return '条件必填：类别测量填写允许值的 JSON 数组，例如 ["甲","乙"]。'
+        return "选填：非输入字段通常留空。范围和执行网格仅用于可控输入；下限/上限若填写须成对。"
+    return hints[key]
+
+
+SETTING_CHOICES = {
+    "optimization.mode": ["pareto", "single", "weighted"],
+    "optimization.default_model_preset": ["gp_rbf_v1", "gp_matern25_v1", "bayesian_linear_v1"],
+    "ratio_policy.mode": ["remove", "stabilized", "valid_region", "require_configuration"],
+    "batch_defaults.mode": ["full_space", "single", "double", "cross"],
+}
+SETTING_NUMBERS = {
+    "schema_version": (2, 2, True), "template_version": (1, None, True),
+    "ratio_policy.epsilon_nm": (0, None, False),
+    "batch_defaults.total_count": (1, 100, True), "batch_defaults.exploration_count": (0, 100, True),
+    "batch_defaults.pool_size": (1, 10000, True), "batch_defaults.seed": (0, 2147483647, True),
+    "batch_defaults.exploration_strength": (0, 100, False),
+}
+
+
+def _setting_hint(key):
+    notes = {
+        "name": "模板名称，可自由修改。", "schema_version": "必填：格式版本，固定为整数 2。",
+        "template_version": "必填：模板版本，整数 ≥ 1。",
+        "optimization.mode": "必填：pareto 多目标折中；single 恰好一个有效目标；weighted 配合 weights/scales 的 JSON 数组。",
+        "optimization.default_model_preset": "默认模型：gp_rbf_v1 RBF、gp_matern25_v1 Matérn 2.5、bayesian_linear_v1 贝叶斯线性。",
+        "optimization.weights": "条件必填：weighted 模式每个有效目标一个非负权重，不能全部为零；JSON 数组，顺序对应有效目标。",
+        "optimization.scales": "条件必填：weighted 模式每个有效目标一个正数尺度（>0）；JSON 数组，顺序对应有效目标。",
+        "ratio_policy.mode": "remove 移除指定比值目标；stabilized 稳定化；valid_region 有效区域；require_configuration 待配置。",
+        "ratio_policy.epsilon_nm": "条件必填：stabilized/valid_region 时数值 > 0；按实际分母单位口径填写。",
+        "modeling.base_responses": '说明性记录，当前实际基础响应由字段“作为响应 + 直接建模”决定。新实验可删除本行，或改为新内部名称的 JSON 数组，例如 ["quality"]。',
+        "context_assumptions": "说明性场景假设，不自动排除模型输入或改变误差计算。全新实验可删除本行或填 []，有相关假设才重新填写。详见 回答.md。",
+    }
+    if key in notes: return notes[key]
+    if key in SETTING_NUMBERS:
+        lower, upper, integer = SETTING_NUMBERS[key]
+        return f"选填：{'整数' if integer else '数值'}范围 {lower} ≤ 值" + (f" ≤ {upper}。" if upper is not None else "。")
+    if key in SETTING_CHOICES: return "选填：从下拉选择固定选项。"
+    return "选填：列表/对象写 JSON；字段引用须改为本实验的内部名称。"
+
+
+def _guide_definition_sheet(guide, sheet, section, columns):
+    hints = [_column_hint(section, key) for _, key in columns]
+    add_column_hints(sheet, hints)
+    for index, (_, key) in enumerate(columns, 1):
+        cells = column_cells(index); hint = hints[index - 1]
+        if key in CHOICES: guide.dropdown(sheet, cells, CHOICES[key], hint)
+        elif key in {"display_digits", "execution_digits"}: guide.number(sheet, cells, hint, integer=True, lower=-12, upper=12)
+        elif key in NUMBER_KEYS:
+            positive = key in {"execution_step", "strength"}
+            guide.number(sheet, cells, hint, lower=0 if positive else None, strict_lower=positive)
+
 
 def _cell_value(value):
     return json.dumps(value, ensure_ascii=False, allow_nan=False) if isinstance(value, (dict, list)) else value
@@ -63,10 +163,13 @@ def _flatten(data, prefix=""):
 def write_template_excel(data, path):
     data = normalize_draft(data)
     workbook = Workbook()
+    guide = ExcelGuide(workbook)
     help_sheet = workbook.active; help_sheet.title = "填写说明"
     for text in (
         "本文件定义实验模板，不是实验记录导入表。可导入“新建 / 复制 / 修改模板”继续编辑。",
         "保留中文表头；每行一个字段，内部名称以英文字母开头，可用数字和下划线，所有表中不得重名。",
+        "各表第 1 行是填写提示，第 2 行是列名，第 3 行起填数据；不要修改表头。固定选项有下拉，数值限定见列名上方。",
+        "必填与条件必填在提示行标出；限定覆盖 10000 行。复制粘贴可能绕过 Excel 校验，导入和最终保存仍由软件校验。",
         "类型填 float/int/category/bool/text，或 数值/整数/类别/是否/文字。单位可自由填写，无量纲填 1。",
         "数值输入填写下限/上限，或离散值，或固定值；这三种方式选一种。是否输入可全部留空。",
         '离散值可写 JSON 数组（例如 [1,2,3] 或 ["甲","乙"]），也可用中英文逗号分隔。',
@@ -103,19 +206,39 @@ def write_template_excel(data, path):
             extra = {k: v for k, v in row.items() if k not in {key for _, key in columns} or v is None}
             if extra_rule: extra["execution_rounding"] = extra_rule
             row["extra"] = extra or None
-            _append(sheet, [row.get(key) for _, key in columns])
+            _append(sheet, [str(row[key]).lower() if key in BOOL_KEYS and type(row.get(key)) is bool else row.get(key) for _, key in columns])
+        _guide_definition_sheet(guide, sheet, section, columns)
     settings = workbook.create_sheet("模板设置")
-    _append(settings, ["属性", "值", "类型（可留空）"])
+    _append(settings, ["属性", "值", "类型（可留空）", "填写说明"])
     for key, value in _flatten({k: v for k, v in data.items() if k not in {s for s, _ in TABLES.values()}}):
         # JSON null distinguishes a stored null from a new empty cell.
-        _append(settings, [key, "null" if value is None else value, "null" if value is None else type(value).__name__])
+        _append(settings, [key, "null" if value is None else str(value).lower() if type(value) is bool else value,
+                           "null" if value is None else type(value).__name__, _setting_hint(key)])
+    add_column_hints(settings, ["必填：属性路径，例如 name、optimization.mode。全新实验删除无关的旧元数据行。",
+        "必填或选填见本行右侧说明；存在固定选项时从下拉选择。列表/对象填写 JSON。",
+        "选填：str 文字 / int 整数 / float 数值 / bool 是否 / list 列表 / dict 对象 / null 空值。",
+        "仅供阅读：本行的必填条件、范围、作用；本列不导入模板配置。"])
+    guide.dropdown(settings, column_cells(3), ["str", "int", "float", "bool", "list", "dict", "null"], "属性值的类型；留空按 JSON 或文字解析。")
+    for row in range(3, settings.max_row + 1):
+        key, _, kind, hint = [settings.cell(row, column).value for column in range(1, 5)]
+        cell = settings.cell(row, 2); cell.comment = Comment(hint, "实验规划助手")
+        cells = cell.coordinate
+        if key in SETTING_CHOICES: guide.dropdown(settings, cells, SETTING_CHOICES[key], hint)
+        elif key in SETTING_NUMBERS:
+            lo, hi, integer = SETTING_NUMBERS[key]
+            guide.number(settings, cells, hint, integer=integer, lower=lo, upper=hi, strict_lower=key == "ratio_policy.epsilon_nm")
+        elif kind == "bool": guide.dropdown(settings, cells, ["true", "false", "是", "否"], hint)
+    settings.column_dimensions["A"].width = 42
+    settings.column_dimensions["B"].width = 60
+    settings.column_dimensions["D"].width = 80
     for sheet in workbook:
-        sheet.freeze_panes = "A2"
-        sheet.auto_filter.ref = sheet.dimensions
-        for cell in sheet[1]:
-            cell.font = Font(bold=True, color="FFFFFF"); cell.fill = PatternFill("solid", fgColor="2563EB")
-        for column in sheet.columns:
-            sheet.column_dimensions[column[0].column_letter].width = min(65, max(16, max(len(str(c.value or "")) for c in column) + 2))
+        if sheet.sheet_state == "hidden": continue
+        if sheet is help_sheet:
+            sheet.column_dimensions["A"].width = 110
+        elif sheet is settings:
+            for cells in sheet.iter_rows(min_row=3):
+                cells[3].alignment = Alignment(wrap_text=True, vertical="top")
+                sheet.row_dimensions[cells[0].row].height = 55
     workbook.save(path)
     workbook.close()
 
@@ -154,14 +277,15 @@ def read_template_excel(path):
         for title, (section, columns) in TABLES.items():
             if title not in workbook: continue
             sheet = workbook[title]
-            headers = {cell.value: index for index, cell in enumerate(sheet[1]) if cell.value is not None}
+            heading_row = header_row(sheet)
+            headers = {cell.value: index for index, cell in enumerate(sheet[heading_row]) if cell.value is not None}
             expected = {label for label, _ in columns} | {key for _, key in columns}
             unknown = set(headers) - expected
             if unknown: raise ValidationError(f"{title}：未知表头 {', '.join(map(str, unknown))}")
             required = "内部名称" if columns is FIELD_COLUMNS else "响应或指标" if section in ("objectives", "outcome_constraints") else "输入参数" if section == "knowledge_priors" else "系数"
             if required not in headers and dict(columns)[required] not in headers:
                 raise ValidationError(f"{title}：缺少表头 {required}")
-            for row_number, cells in enumerate(sheet.iter_rows(min_row=2), 2):
+            for row_number, cells in enumerate(sheet.iter_rows(min_row=heading_row + 1), heading_row + 1):
                 if all(c.value is None or str(c.value).strip() == "" for c in cells): continue
                 try:
                     row = {}
@@ -198,13 +322,15 @@ def read_template_excel(path):
                 except (ValueError, TypeError, KeyError) as exc:
                     raise ValidationError(f"{title} 第 {row_number} 行：{exc}") from exc
         if "模板设置" in workbook:
-            for row_number, (key, value, *rest) in enumerate(workbook["模板设置"].iter_rows(min_row=2, values_only=True), 2):
+            first = header_row(workbook["模板设置"]) + 1
+            for row_number, (key, value, *rest) in enumerate(workbook["模板设置"].iter_rows(min_row=first, values_only=True), first):
                 if key is None: continue
                 try:
                     key = str(key).strip()
                     if key.split(".")[0] in {s for s, _ in TABLES.values()}: raise ValidationError("字段与目标请在对应工作表填写")
                     kind = rest[0] if rest else None
                     if kind == "str": value = str(value) if value is not None else ""
+                    elif kind == "bool": value = _parse("enabled", value)
                     elif isinstance(value, str):
                         try: value = json.loads(value)
                         except json.JSONDecodeError: value = ALIASES.get(value, value)

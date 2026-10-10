@@ -8,6 +8,10 @@ from pathlib import Path
 from experiment_planner.application.records import normalize_observations
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.template import parse_value
+from experiment_planner.io.excel_guidance import (
+    ExcelGuide, add_column_hints, add_value_validation, column_cells,
+    has_hint_row, value_hint,
+)
 
 
 @dataclass
@@ -32,12 +36,19 @@ def missing(value):
     return value is None or (isinstance(value, str) and not value.strip())
 
 
-def checked_headers(values):
+class TableHeaders(list):
+    """A list of names with the original header's physical row."""
+    def __init__(self, names, row_number):
+        super().__init__(names)
+        self.row_number = row_number
+
+
+def checked_headers(values, row_number=1):
     headers = [str(value).strip() if value is not None else "" for value in values]
     while headers and not headers[-1]: headers.pop()
     if not headers or any(not h for h in headers) or len(headers) != len(set(headers)):
-        raise ValidationError("导入表头为空或重复，请检查第一行")
-    return headers
+        raise ValidationError(f"导入表头为空或重复，请检查第 {row_number} 行")
+    return TableHeaders(headers, row_number)
 
 
 def table_rows(path):
@@ -61,9 +72,14 @@ def table_rows(path):
         workbook = load_workbook(path, read_only=True, data_only=False)
         try:
             rows = workbook.active.iter_rows(values_only=True)
-            headers = checked_headers(next(rows, ()))
+            values = next(rows, ())
+            heading_row = 1
+            if has_hint_row(values):
+                heading_row = 2
+                values = next(rows, ())
+            headers = checked_headers(values, heading_row)
             yield headers
-            for number, values in enumerate(rows, 2):
+            for number, values in enumerate(rows, heading_row + 1):
                 row = {name: values[i] if i < len(values) else None for i, name in enumerate(headers)}
                 if any(not missing(value) for value in values[len(headers):]): row[None] = values[len(headers):]
                 yield number, row
@@ -99,13 +115,14 @@ def preview_import(service, path, mapping=None):
     first_inputs = [p["name"] for p in t.parameters[:count]]
     with closing(table_rows(path)) as rows:
         headers = next(rows)
+        heading_row = headers.row_number
         mapped = {h: mapped_name(h) for h in headers}
         if len(set(mapped.values())) != len(mapped):
-            preview.errors.append({"row": 1, "message": "多列映射到同一字段，请调整列对应关系"})
+            preview.errors.append({"row": heading_row, "message": "多列映射到同一字段，请调整列对应关系"})
             return preview
         absent = [name for name in first_inputs if name not in mapped.values()]
         if absent:
-            preview.errors.append({"row": 1, "message": "用于结束判断的输入列未匹配：" + "、".join(absent)})
+            preview.errors.append({"row": heading_row, "message": "用于结束判断的输入列未匹配：" + "、".join(absent)})
             return preview
         for row_number, raw in rows:
             row = {mapped[k]: value for k, value in raw.items() if k in mapped}
@@ -192,7 +209,7 @@ def write_table(path, headers, rows, title):
 
 
 def export_import_template(template, path):
-    """A header-only input file, accepted by the normal importer after filling."""
+    """An empty input file with visible Excel hints and cell validation."""
     headers = ["external_id", "status", "note"]
     for field in template.parameters:
         headers.extend([field["name"], field["name"] + "_note"])
@@ -207,9 +224,12 @@ def export_import_template(template, path):
     if path.suffix.lower() == ".xlsx":
         from openpyxl import load_workbook
         wb = load_workbook(path)
+        _guide_import_sheet(wb, template, headers)
         help_sheet = wb.create_sheet("填写说明")
         help_sheet.append(["模板", template.data.get("name", ""), "版本", template.data["template_version"]])
         help_sheet.append(["提示", "只在“导入数据”填写记录；不要在数据中间留空行。每次复测填写不同 external_id。"])
+        help_sheet.append(["行与限定", "第 1 行是填写提示，第 2 行是列名，第 3 行起填写。下拉及数值校验覆盖 10000 行；粘贴可能绕过 Excel 校验，最终以软件预览为准。"])
+        help_sheet.append(["必填", "每条记录所有输入参数必填，固定输入也要填。测量与误差可暂缺；记录可保存，完整性决定能否用于模型。"])
         help_sheet.append(["状态", "留空为 completed；可填 completed / partial / pending / running / failed / cancelled。"])
         help_sheet.append(["误差类型", "std / sem / bounds / interval / unspecified；只填 ± 数字不代表已知标准误差。"])
         help_sheet.append(["列名", "显示名称", "单位", "类型", "范围 / 取值", "备注"])
@@ -220,6 +240,52 @@ def export_import_template(template, path):
             for cell in cells:
                 if isinstance(cell.value, str): cell.data_type = "s"
         wb.active = 0; wb.save(path); wb.close()
+
+
+def _guide_import_sheet(workbook, template, headers):
+    sheet = workbook.active
+    guide = ExcelGuide(workbook)
+    hints = {
+        "external_id": "选填：外部实验编号。复测使用不同编号；已有编号用于重复导入检查。",
+        "status": "选填：从下拉选择状态；留空默认为 completed（已完成）。",
+        "note": "选填：整条实验备注。",
+    }
+    choices = {"status": ["completed", "partial", "pending", "running", "failed", "cancelled"]}
+    numeric = {}
+    for field in template.parameters:
+        name = field["name"]
+        hints[name] = value_hint(field, required=True)
+        hints[name + "_note"] = "选填：该输入的备注。实际数值不要求落在推荐执行网格上。"
+    for field in template.measurements:
+        name = field["name"]
+        hints[name] = value_hint(field, limits=False) + "未测可留空。"
+        hints.update({
+            name + "_unit": f"选填：单位只能为 {field.get('unit', '1')}，留空使用模板单位。更换单位请先修改模板。",
+            name + "_uncertainty": "选填：不确定度数值 ≥ 0，使用本测量单位。有误差类型时按类型填写；未测量时留空。",
+            name + "_uncertainty_kind": "选填：std 标准差、sem 均值标准误、bounds 对称界限、interval 区间、unspecified 未知。需配合不确定度数值解释大小。",
+            name + "_distribution": "选填：normal 正态、uniform 均匀。bounds + uniform 才转换为标准误差；interval + normal 需覆盖因子或置信水平。",
+            name + "_coverage_factor": "选填：数值 > 0。interval + normal 若需换算标准误差，与置信水平至少填一个；否则误差按未知处理。",
+            name + "_confidence": "选填：0 < 数值 < 1，例如 0.95。interval + normal 若需换算标准误差，与覆盖因子至少填一个。",
+            name + "_note": "选填：该测量备注。",
+        })
+        choices[name + "_unit"] = [field.get("unit", "1")]
+        if field.get("value_type", "float") in ("float", "int"):
+            choices[name + "_uncertainty_kind"] = ["unspecified", "std", "sem", "bounds", "interval"]
+            choices[name + "_distribution"] = ["normal", "uniform"]
+            numeric[name + "_uncertainty"] = {"lower": 0}
+            numeric[name + "_coverage_factor"] = {"lower": 0, "strict_lower": True}
+            numeric[name + "_confidence"] = {"lower": 0, "upper": 1, "strict_lower": True, "strict_upper": True}
+        else:
+            choices[name + "_uncertainty_kind"] = ["unspecified"]
+            for suffix in ("_uncertainty", "_uncertainty_kind", "_distribution", "_coverage_factor", "_confidence"):
+                hints[name + suffix] = "非数值测量：留空，不填写数值误差；误差类型只能 unspecified（未知）。"
+    add_column_hints(sheet, [hints[key] for key in headers])
+    for index, key in enumerate(headers, 1):
+        if key in choices: guide.dropdown(sheet, column_cells(index), choices[key], hints[key])
+        if key in numeric: guide.number(sheet, column_cells(index), hints[key], **numeric[key])
+    for field in template.parameters + template.measurements:
+        index = headers.index(field["name"]) + 1
+        add_value_validation(guide, sheet, index, field, hints[field["name"]], limits=field in template.parameters)
 
 
 def export_analysis(report, template, path):

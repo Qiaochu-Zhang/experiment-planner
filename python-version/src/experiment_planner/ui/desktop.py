@@ -29,7 +29,7 @@ from experiment_planner.io.template_excel import read_template_draft
 class PythonWindow(MainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("实验规划助手 · 0.4.0 · Python 3.12 / 3.13")
+        self.setWindowTitle("实验规划助手 · 0.4.1 · Python 3.12 / 3.13")
         self.loaded_template_key = None
         self.analysis_report = None
         self.summary.setText("新建或打开本地项目，录入实验后规划下一批条件。")
