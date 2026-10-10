@@ -18,7 +18,7 @@ DTYPE = torch.double
 
 class Encoder:
     def __init__(self, template):
-        self.fields = [p for p in template.parameters if p.get("use_as_model_input", True)]
+        self.fields = [p for p in template.parameters if p.get("value_type") != "text" and p.get("use_as_model_input", True)]
         self.indices = {}
         width = 0
         for p in self.fields:

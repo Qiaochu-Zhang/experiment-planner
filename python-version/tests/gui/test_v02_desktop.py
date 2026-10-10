@@ -71,7 +71,7 @@ def test_tree_preserves_unknown_properties_and_nested_null_bool_types(app,templa
     changed=Template(editor.data())
     assert changed.parameters[0]["label"]=="新的中文名称"
     assert changed.data["custom"]==original["custom"]
-    editor.close()
+    editor.accept(); editor.close()
 
 
 def test_help_hover_has_clickable_blue_link_and_offline_target(app,monkeypatch):

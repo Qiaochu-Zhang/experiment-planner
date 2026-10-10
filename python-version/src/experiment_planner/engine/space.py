@@ -32,6 +32,9 @@ class BatchRequest:
         names = {p["name"] for p in template.parameters}
         if set(self.variables) - names or len(set(self.variables)) != len(self.variables): raise ValidationError("变化变量名称无效")
         if self.variables and self.baseline is None:raise ValidationError("指定变化变量时需要基准，以固定其余条件")
+        for p in template.parameters:
+            if p.get("value_type") == "text" and not any(k in p for k in ("values", "fixed_value")) and (self.baseline is None or not self.baseline.get(p["name"])):
+                raise ValidationError(f"自由文字输入 {p['name']} 需要选择基准实验以沿用文字，或在模板设置固定值/离散值")
         if self.mode != "full_space" or self.baseline is not None:
             if self.baseline is None: raise ValidationError("此模式需要完整基准条件")
             template.validate_conditions(self.baseline)
@@ -104,7 +107,7 @@ def candidate_pool(template, request, excluded=()):
     candidates = []
     fields = {p["name"]: p for p in template.parameters}
     allowed = request.variables or list(fields)
-    choices = {name: parameter_values(fields[name], rng, request.pool_size) for name in fields}
+    choices = {name: [request.baseline[name]] if fields[name].get("value_type") == "text" and not any(k in fields[name] for k in ("values", "fixed_value")) else parameter_values(fields[name], rng, request.pool_size) for name in fields}
     if request.mode == "single": subsets = list(itertools.combinations(allowed, 1))
     elif request.mode == "double": subsets = [s for count in ([2] if request.exact_two else [1,2]) for s in itertools.combinations(allowed, count)]
     else: subsets = [tuple(allowed)]

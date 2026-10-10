@@ -25,10 +25,10 @@ def new_fields():
     parameter = FieldDialog('parameters')
     parameter.name.setText('speed'); parameter.label.setText('速度')
     parameter.lower.setText('0'); parameter.upper.setText('10')
-    x = parameter.value(); parameter.close()
+    x = parameter.value(); parameter.accept(); parameter.close()
     measurement = FieldDialog('measurements')
     measurement.name.setText('quality'); measurement.label.setText('质量得分')
-    y = measurement.value(); measurement.close()
+    y = measurement.value(); measurement.accept(); measurement.close()
     return x, y
 
 
@@ -36,7 +36,7 @@ def custom_template():
     fields = FieldsEditor(blank_template())
     x, y = new_fields()
     fields.set_field('parameters', x); fields.set_field('measurements', y)
-    result = Template(fields.data); fields.close()
+    result = Template(fields.data); fields.accept(); fields.close()
     return result
 
 
@@ -141,7 +141,7 @@ def test_create_dialog_starts_blank_or_opens_existing_file(qt_application, tmp_p
             assert editor.data['parameters'] == []
             fields = FieldsEditor(editor.data); x, y = new_fields()
             fields.set_field('parameters', x); fields.set_field('measurements', y)
-            editor.data = fields.data; fields.close()
+            editor.data = fields.data; fields.accept(); fields.close()
         else:
             editor.data = rename_field(editor.data, 'speed', 'new_speed')
         editor.build_pages(); editor.name.setText('独立模板'); editor.save()
@@ -161,6 +161,7 @@ def test_full_property_editor_keeps_draft_editable(qt_application):
         tree.accept()
     QTimer.singleShot(0, change_tree); editor.edit_all()
     assert editor.data['custom_setting']['enabled'] is True and not editor.data['parameters']
+    QTimer.singleShot(0, lambda: QApplication.activeModalWidget().button(QMessageBox.StandardButton.Discard).click())
     editor.close()
 
 
@@ -180,7 +181,7 @@ def test_fixed_category_and_boolean_fields_work_in_prediction_form(qt_applicatio
         dialog = FieldDialog('parameters'); dialog.name.setText(name)
         dialog.kind.setCurrentIndex(dialog.kind.findData(kind))
         dialog.domain.setCurrentIndex(dialog.domain.findData('fixed_value')); dialog.fixed.setText(value)
-        base['parameters'].append(dialog.value()); dialog.close()
+        base['parameters'].append(dialog.value()); dialog.accept(); dialog.close()
     template = Template(base)
     window = PythonWindow(); window.set_project(Project.create(tmp_path / 'fixed.sqlite', '固定参数', template))
     window.conditions.editors['speed'].setText('2')

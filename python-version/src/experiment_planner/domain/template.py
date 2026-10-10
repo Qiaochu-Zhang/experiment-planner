@@ -2,6 +2,7 @@ import copy
 import json
 import math
 import re
+from pathlib import Path
 from importlib.resources import files
 
 from experiment_planner.domain.errors import ValidationError
@@ -43,9 +44,15 @@ class Template:
 
     @classmethod
     def read(cls, path):
+        if Path(path).suffix.lower() == ".xlsx":
+            from experiment_planner.io.template_excel import read_template_excel
+            return cls(read_template_excel(path))
         with open(path, encoding="utf-8") as source: return cls(json.load(source))
 
     def write(self, path):
+        if Path(path).suffix.lower() == ".xlsx":
+            from experiment_planner.io.template_excel import write_template_excel
+            return write_template_excel(self.data, path)
         with open(path, "w", encoding="utf-8") as target:
             json.dump(self.data, target, ensure_ascii=False, indent=2, allow_nan=False)
 
@@ -91,18 +98,21 @@ class Template:
                 raise ValidationError(f"{field['name']}：事后/未知测量或备注不能作为未来输入")
         for p in self.parameters:
             kind = p.get("value_type", "float")
-            if kind == "text": raise ValidationError("文字备注不能作为可控输入")
-            if kind in ("bool", "category") and p.get("execution_rounding", {}).get("mode", "none") != "none":
-                raise ValidationError("类别/布尔输入不能数值取整")
+            if kind == "text" and p.get("use_as_model_input", False): raise ValidationError("文字输入不能进入数值模型，请取消作为模型输入")
+            if kind in ("bool", "category", "text") and p.get("execution_rounding", {}).get("mode", "none") != "none":
+                raise ValidationError("类别/布尔/文字输入不能数值取整")
             grid_spec(p.get("execution_rounding", {}))
             if "bounds" in p:
+                if kind not in ("float", "int"): raise ValidationError("只有数值输入可以设置范围")
                 lo, hi = p["bounds"]
                 if not all(type(x) in (float, int) and math.isfinite(x) for x in (lo, hi)) or lo >= hi:
                     raise ValidationError("输入范围无效")
-            elif "fixed_value" not in p and "values" not in p and kind != "bool":
+            elif "fixed_value" not in p and "values" not in p and kind not in ("bool", "text"):
                 raise ValidationError("可控输入需要范围、离散值或固定值")
             if "values" in p and (not p["values"] or len(set(p["values"])) != len(p["values"])):
                 raise ValidationError("离散值不能为空或重复")
+            if "values" in p:
+                for value in p["values"]: self._validate_parameter(p, value)
             if "fixed_value" in p: self._validate_parameter(p, p["fixed_value"])
         self.graph = FormulaGraph(self.parameters + self.measurements, self.metrics, d["template_version"])
         fields = {f["name"]: f for f in self.fields}

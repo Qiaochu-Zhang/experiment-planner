@@ -20,12 +20,16 @@ from experiment_planner.ui.conditions import ConditionsForm
 from experiment_planner.ui.help import attach_help, help_label, show_help
 from experiment_planner.ui.tree_editor import chinese_buttons
 from experiment_planner.ui.messages import analysis_text
+from experiment_planner.ui.interaction import ask_save_changes
+from experiment_planner.storage.session import ProjectSession
+from experiment_planner.application.service import PlannerService
+from experiment_planner.io.template_excel import read_template_draft
 
 
 class PythonWindow(MainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("实验规划助手 · 0.3.0 · Python 3.12 / 3.13")
+        self.setWindowTitle("实验规划助手 · 0.4.0 · Python 3.12 / 3.13")
         self.loaded_template_key = None
         self.analysis_report = None
         self.summary.setText("新建或打开本地项目，录入实验后规划下一批条件。")
@@ -128,6 +132,62 @@ class PythonWindow(MainWindow):
         self.tabs.addTab(analysis_page, "预测 / 趋势图")
         button("预测技术详情",lambda:self.guard(lambda:self.show_details(self.analysis_report or {})),analysis_layout)
         self.build_workspace()
+        project_actions = QHBoxLayout()
+        self.centralWidget().layout().insertLayout(1, project_actions)
+        self.save_project_button = button("保存项目", lambda: self.guard(self.save_project), project_actions)
+        button("项目另存为（可覆盖同名）", lambda: self.guard(self.save_project_as), project_actions)
+        from PySide6.QtGui import QKeySequence, QShortcut
+        self.save_shortcut = QShortcut(QKeySequence.StandardKey.Save, self)
+        self.save_shortcut.activated.connect(lambda: self.guard(self.save_project))
+
+    def set_project(self, project):
+        if not self.close_project():
+            project.close()
+            return False
+        self.service = PlannerService(project)
+        self.refresh()
+        return True
+
+    def create_project(self, template=None):
+        path, _ = QFileDialog.getSaveFileName(self, "新建项目（保存时可覆盖同名项目）", "project.sqlite", "项目 (*.sqlite)")
+        if path and self.close_project(): self.set_project(ProjectSession(path, template=template, creating=True))
+
+    def open_project(self):
+        path, _ = QFileDialog.getOpenFileName(self, "打开项目或备份", "", "项目 (*.sqlite)")
+        if path and self.close_project(): self.set_project(ProjectSession(path))
+
+    def create_from_template(self):
+        path, _ = QFileDialog.getOpenFileName(self, "选择实验模板", "", "模板 (*.json *.xlsx);;Excel 模板 (*.xlsx);;JSON 模板 (*.json)")
+        if path: self.create_project(Template.read(path))
+
+    def save_project(self):
+        project = self.require_project()
+        if isinstance(project, ProjectSession): project.save()
+        self.refresh()
+        self.statusBar().showMessage("项目已保存", 5000)
+
+    def save_project_as(self):
+        project = self.require_project()
+        default = str(getattr(project, "target_path", project.path))
+        path, _ = QFileDialog.getSaveFileName(self, "项目另存为（可覆盖同名项目）", default, "项目 (*.sqlite)")
+        if not path: return
+        target = Path(path).resolve()
+        if isinstance(project, ProjectSession):
+            old_target, old_fingerprint = project.target_path, project._saved_fingerprint
+            from experiment_planner.storage.session import fingerprint
+            project.target_path = target
+            project._saved_fingerprint = fingerprint(target) if target != old_target else old_fingerprint
+            try: self.save_project()
+            except BaseException:
+                project.target_path, project._saved_fingerprint = old_target, old_fingerprint
+                raise
+        else:
+            project.backup(target)
+
+    def export_template(self):
+        project = self.require_project()
+        path, _ = QFileDialog.getSaveFileName(self, "导出模板定义", "实验模板.xlsx", "Excel 模板 (*.xlsx);;JSON 模板 (*.json)")
+        if path: project.template.write(path)
 
     def download_import_template(self):
         template = self.require_project().template
@@ -160,6 +220,9 @@ class PythonWindow(MainWindow):
     def refresh(self):
         selected_baseline=self.baseline.currentData()
         super().refresh()
+        project = self.require_project()
+        if isinstance(project, ProjectSession):
+            self.summary.setText(self.summary.text().replace(str(project.path), str(project.target_path)) + ("\n有未保存变化；点击“保存项目”写回文件。" if project.dirty else "\n项目已保存。"))
         if hasattr(self, "template_view"):
             project=self.require_project();template=project.template
             key=(str(project.path),template.data["template_version"])
@@ -193,6 +256,14 @@ class PythonWindow(MainWindow):
             if hasattr(self,"home_summary"):self.home_summary.setText(self.summary.text()+"\n\n"+goals)
 
     def close_project(self):
+        if self.service and isinstance(self.service.project, ProjectSession) and self.service.project.dirty:
+            choice = ask_save_changes(self)
+            if choice == QMessageBox.StandardButton.Cancel: return False
+            if choice == QMessageBox.StandardButton.Save:
+                try: self.save_project()
+                except Exception as exc:
+                    from experiment_planner.ui.messages import user_error
+                    QMessageBox.warning(self, "项目未保存", user_error(exc)); return False
         super().close_project()
         self.loaded_template_key=None
         self.analysis_report=None
@@ -200,6 +271,13 @@ class PythonWindow(MainWindow):
         for name in ("template_view", "conditions", "analysis_output", "plot_image"):
             if hasattr(self, name):
                 getattr(self, name).clear()
+        return True
+
+    def closeEvent(self, event):
+        if not self.close_project(): event.ignore(); return
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().removeEventFilter(self)
+        event.accept()
 
     def edit_template(self, section="precision"):
         project=self.require_project()
@@ -217,7 +295,7 @@ class PythonWindow(MainWindow):
                     self.create_project(dialog.result_template)
                     if self.service.project is not project:return
                 elif choice.clickedButton()==save_file:
-                    path,_=QFileDialog.getSaveFileName(self,"另存修改后的模板","修改后的模板.json","模板 (*.json)")
+                    path,_=QFileDialog.getSaveFileName(self,"另存修改后的模板","修改后的模板.xlsx","Excel 模板 (*.xlsx);;JSON 模板 (*.json)")
                     if path:dialog.result_template.write(path);return
                 continue
             self.refresh();break
@@ -475,12 +553,12 @@ class PythonWindow(MainWindow):
         elif source.currentData()=="current":base=self.require_project().template
         elif source.currentData()=="builtin":base=Template.builtin()
         else:
-            path,_=QFileDialog.getOpenFileName(self,"打开模板文件","","模板 (*.json)")
+            path,_=QFileDialog.getOpenFileName(self,"打开模板文件","","模板 (*.json *.xlsx);;Excel 模板 (*.xlsx);;JSON 模板 (*.json)")
             if not path:return
-            base=Template.read(path)
+            base=read_template_draft(path)
         dialog=TemplateEditor(base,self,creating=True)
         if not dialog.exec():return
-        path,_=QFileDialog.getSaveFileName(self,"保存新模板","新模板.json","模板 (*.json)")
+        path,_=QFileDialog.getSaveFileName(self,"保存新模板","新模板.xlsx","Excel 模板 (*.xlsx);;JSON 模板 (*.json)")
         if path:dialog.result_template.write(path)
 
     def show_details(self,value):

@@ -4,7 +4,7 @@ import copy
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
     QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox,
-    QTabWidget, QTableWidget, QVBoxLayout, QWidget, QHeaderView)
+    QTabWidget, QTableWidget, QVBoxLayout, QWidget, QHeaderView, QFileDialog)
 
 from experiment_planner.domain.template import Template
 from experiment_planner.domain.errors import ValidationError
@@ -14,6 +14,7 @@ from experiment_planner.knowledge.priors import check_capabilities
 from experiment_planner.ui.help import attach_help, help_label, show_help
 from experiment_planner.ui.tree_editor import JsonTreeEditor, chinese_buttons
 from experiment_planner.ui.messages import user_error
+from experiment_planner.ui.interaction import DraftDialog, install_wheel_filter
 
 
 def combo(items, selected=None):
@@ -45,9 +46,10 @@ def table(headers):
     return result
 
 
-class TemplateEditor(QDialog):
+class TemplateEditor(DraftDialog):
     def __init__(self, template, parent=None, section="precision", creating=False):
         super().__init__(parent)
+        install_wheel_filter()
         self.data=normalize_draft(template.data if isinstance(template, Template) else template)
         self.result_template=None
         self.creating=creating
@@ -61,11 +63,18 @@ class TemplateEditor(QDialog):
         fields=QPushButton("参数 / 测量 / 公式（增删改名）");fields.clicked.connect(self.edit_fields);top.addWidget(fields)
         full=QPushButton("全部属性（字段 / 公式 / 范围 / 约束）");full.clicked.connect(self.edit_all);top.addWidget(full)
         help_button=QPushButton("变量与设置说明");help_button.clicked.connect(lambda:show_help("template",self));top.addWidget(help_button)
+        exchange=QHBoxLayout();outer.addLayout(exchange)
+        for title, callback in (("导入 Excel 模板", self.import_excel), ("导出 Excel 模板", self.export_excel)):
+            b=QPushButton(title);b.clicked.connect(callback);exchange.addWidget(b);attach_help(b,"template")
+        exchange.addStretch()
         self.tabs=QTabWidget();outer.addWidget(self.tabs)
         self.build_pages()
         self.tabs.setCurrentIndex({"precision":0,"priors":1,"objectives":2}.get(section,0))
         self.buttons=chinese_buttons(QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel))
         self.buttons.accepted.connect(self.save);self.buttons.rejected.connect(self.reject);outer.addWidget(self.buttons)
+        initial = copy.deepcopy(self.data)
+        self.track_changes(self.collect, self.save, lambda: setattr(self, "data", copy.deepcopy(initial)))
+        attach_help(self.name, "template")
 
     def build_pages(self):
         while self.tabs.count():
@@ -83,13 +92,18 @@ class TemplateEditor(QDialog):
             step=number(rule.get("step") or 1,1e-12,1e12,12);origin=number(rule.get("origin",0),decimals=12)
             display=combo([("原始精度",None),*[(str(i),i) for i in range(-12,13)]],p.get("display_digits"))
             for col,w in enumerate((label,mode,digits,step,origin,display)):self.precision.setCellWidget(row,col,w)
-            for w in (mode,digits,step,origin,display):attach_help(w,"precision")
+            attach_help(label, "fields", p.get("note") or "输入参数的单位和取值在“参数 / 测量 / 公式”中编辑。")
+            for w in (mode,digits,step,origin):attach_help(w,"precision")
+            attach_help(display,"display_precision")
             self.precision_rows.append((p,mode,digits,step,origin,display))
             numeric=p.get("value_type","float") in ("float","int")
             mode.setEnabled(numeric)
+            display.setEnabled(numeric)
             def sync(_, m=mode,d=digits,s=step,o=origin,allowed=numeric):
                 d.setEnabled(allowed and m.currentData()=="digits");s.setEnabled(allowed and m.currentData()=="step");o.setEnabled(allowed and m.currentData()!="none")
             mode.currentIndexChanged.connect(sync);sync(0)
+        self.precision.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        self.precision.setColumnWidth(0, max([160] + [self.precision.cellWidget(row, 0).sizeHint().width() + 20 for row in range(self.precision.rowCount())]))
         layout.addWidget(self.precision)
         layout.addWidget(QLabel("测量和派生指标的显示小数位数（不改变保存和建模数值）"))
         self.response_display = table(["测量 / 指标", "显示小数位数"])
@@ -99,11 +113,22 @@ class TemplateEditor(QDialog):
             editor = combo([("原始精度", None), *[(str(i), i) for i in range(-12, 13)]], field.get("display_digits"))
             self.response_display.setCellWidget(row, 0, QLabel(field.get("label", field["name"])))
             self.response_display.setCellWidget(row, 1, editor)
+            editor.setEnabled(field.get("value_type", "float") in ("float", "int"))
+            attach_help(editor, "display_precision")
+            attach_help(self.response_display.cellWidget(row, 0), "measurements", field.get("note"))
             self.response_display_rows.append((field["name"], editor))
+        self.response_display.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        self.response_display.setColumnWidth(0, max([160] + [self.response_display.cellWidget(row, 0).sizeHint().width() + 20 for row in range(self.response_display.rowCount())]))
         layout.addWidget(self.response_display)
         bulk=QHBoxLayout();layout.addLayout(bulk)
-        self.bulk_digits=integer(0);bulk.addWidget(QLabel("所有数值参数统一小数位数"));bulk.addWidget(self.bulk_digits)
-        apply=QPushButton("应用到所有工艺参数");apply.clicked.connect(self.apply_digits);bulk.addWidget(apply);bulk.addStretch()
+        self.bulk_digits=integer(0);bulk.addWidget(help_label("统一执行小数位数", "precision"));bulk.addWidget(self.bulk_digits)
+        apply=QPushButton("应用到所有数值输入的执行精度");apply.clicked.connect(self.apply_digits);bulk.addWidget(apply);bulk.addStretch()
+        display_bulk=QHBoxLayout();layout.addLayout(display_bulk)
+        self.bulk_display=combo([("原始精度",None), *[(str(i),i) for i in range(-12,13)]])
+        display_bulk.addWidget(help_label("统一显示小数位数", "display_precision"));display_bulk.addWidget(self.bulk_display)
+        for title, section in (("应用到输入参数显示位数", "parameters"), ("应用到测量 / 派生指标显示位数", "responses")):
+            button=QPushButton(title);button.clicked.connect(lambda checked=False, s=section: self.apply_display_digits(s));display_bulk.addWidget(button)
+        display_bulk.addStretch()
         self.tabs.addTab(page,"推荐工艺精度")
 
         page=QWidget();layout=QVBoxLayout(page)
@@ -158,7 +183,9 @@ class TemplateEditor(QDialog):
         ratio_form=QFormLayout();layout.addLayout(ratio_form)
         policy=self.data.get("ratio_policy",{"mode":"remove"})
         self.ratio=combo([("先不设置（推荐前需选择）","require_configuration"),("有效区域内比值","valid_region"),("稳定化比值","stabilized"),("移除比值目标","remove")],policy["mode"])
+        attach_help(self.ratio, "ratio_policy")
         self.epsilon=number(policy.get("epsilon_nm") or 1,1e-12,1e12,12)
+        attach_help(self.epsilon, "epsilon_nm")
         self.ratio.currentIndexChanged.connect(lambda _:self.epsilon.setEnabled(self.ratio.currentData() in ("valid_region","stabilized")))
         self.epsilon.setEnabled(self.ratio.currentData() in ("valid_region","stabilized"))
         ratio_form.addRow(help_label("分母策略","ratio_policy"),self.ratio);ratio_form.addRow(help_label("分母阈值（nm）","epsilon_nm"),self.epsilon)
@@ -167,14 +194,35 @@ class TemplateEditor(QDialog):
         newer.clicked.connect(self.new_goals);layout.addWidget(newer)
         self.tabs.addTab(page,"实验优化目标")
 
+    def import_excel(self):
+        from experiment_planner.io.template_excel import read_template_excel
+        path, _ = QFileDialog.getOpenFileName(self, "导入模板定义（可继续补齐空白属性）", "", "Excel 模板 (*.xlsx)")
+        if not path: return
+        try: data = read_template_excel(path)
+        except Exception as exc: QMessageBox.warning(self, "无法导入模板", user_error(exc)); return
+        self.data = data; self.name.setText(data.get("name", "")); self.build_pages()
+
+    def export_excel(self):
+        from experiment_planner.io.template_excel import write_template_excel
+        path, _ = QFileDialog.getSaveFileName(self, "导出当前模板草稿", "实验模板.xlsx", "Excel 模板 (*.xlsx)")
+        if not path: return
+        try: write_template_excel(self.collect(), path)
+        except Exception as exc: QMessageBox.warning(self, "无法导出模板", user_error(exc))
+
     def apply_digits(self):
         for p,mode,digits,_,_,_ in self.precision_rows:
             if p.get("value_type","float") in ("float","int"):
                 mode.setCurrentIndex(mode.findData("digits"));digits.setValue(self.bulk_digits.value())
 
+    def apply_display_digits(self, section):
+        value = self.bulk_display.currentData()
+        editors = [row[-1] for row in self.precision_rows] if section == "parameters" else [editor for _, editor in self.response_display_rows]
+        for editor in editors:
+            if editor.isEnabled(): editor.setCurrentIndex(editor.findData(value))
+
     def add_prior(self,prior):
         enabled=QCheckBox();enabled.setChecked(prior.get("enabled",True))
-        inputs=combo([(p.get("label",p["name"]),p["name"]) for p in self.data["parameters"]],prior.get("input"))
+        inputs=combo([(p.get("label",p["name"]),p["name"]) for p in self.data["parameters"] if p.get("value_type") != "text"],prior.get("input"))
         responses=combo([(f.get("label",f["name"]),f["name"]) for f in self.data.get("measurements",[])+self.data.get("derived_metrics",[]) if f.get("is_response") and f.get("model_base",True)],prior.get("response"))
         relation=combo([("无关","independent"),("线性趋势","linear"),("比例趋势（软先验）","proportional"),("单调趋势（线性模型）","monotonic"),("弱影响（线性模型）","weak")],prior.get("relation","linear"))
         coefficient=number(prior.get("coefficient",0));strength=number(prior.get("strength",1),1e-8)

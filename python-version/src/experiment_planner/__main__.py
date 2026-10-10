@@ -30,15 +30,22 @@ def main():
     app=QApplication([]);app.setApplicationName("ExperimentPlanner")
     window=PythonWindow()
     if args.project:
-        from experiment_planner.storage.project import Project
-        window.set_project(Project(args.project))
+        from experiment_planner.storage.session import ProjectSession
+        window.set_project(ProjectSession(args.project))
     window.show()
     if args.smoke:QTimer.singleShot(500,window.close);QTimer.singleShot(600,app.quit)
     result=app.exec()
+    clipboard = app.clipboard()
+    mime = clipboard.mimeData()
+    if mime is not None and mime.hasFormat("application/x-experiment-planner-fields"):
+        # Replace Python-created structured MIME with native Qt text at exit.
+        clipboard.setText(clipboard.text())
     # Destroy widgets while QApplication and its translator are still alive.
     # Python wrappers may otherwise release Qt resources during interpreter exit.
     for widget in app.topLevelWidgets():widget.deleteLater()
     QCoreApplication.sendPostedEvents(None,QEvent.Type.DeferredDelete)
+    from experiment_planner.ui.interaction import remove_wheel_filter
+    remove_wheel_filter()
     return result
 
 

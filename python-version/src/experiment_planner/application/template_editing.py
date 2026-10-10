@@ -7,6 +7,37 @@ from experiment_planner.domain.errors import ValidationError
 SECTIONS = ("parameters", "measurements", "derived_metrics")
 
 
+def paste_fields(data, source_section, fields, target_section):
+    """Copy fields as editable drafts; never invent a range or a formula."""
+    result = copy.deepcopy(data)
+    names = {f["name"] for s in SECTIONS for f in result[s]}
+    added = []
+    common = {"name", "label", "value_type", "unit", "note", "display_digits"}
+    for field in fields:
+        item = copy.deepcopy(field if source_section == target_section else
+                             {k: v for k, v in field.items() if k in common})
+        stem = item["name"]
+        name = stem
+        suffix = 1
+        while name in names:
+            name = f"{stem}_copy{suffix}"
+            suffix += 1
+        item["name"] = name
+        names.add(name)
+        if source_section != target_section:
+            if target_section == "derived_metrics": item["expression"] = ""
+            # Roles and measurement timing also need a deliberate choice.
+        result[target_section].append(item)
+        added.append(item)
+    if source_section == target_section:
+        mapping = {old["name"]: new["name"] for old, new in zip(fields, added)}
+        for item in added:
+            if "expression" in item:
+                item["expression"] = re.sub(r"\b[A-Za-z][A-Za-z0-9_]*\b",
+                    lambda match: mapping.get(match[0], match[0]), item["expression"])
+    return result, added
+
+
 def blank_template():
     return {"schema_version": 2, "template_version": 1, "name": "全新实验模板",
             "parameters": [], "measurements": [], "derived_metrics": [], "objectives": [],

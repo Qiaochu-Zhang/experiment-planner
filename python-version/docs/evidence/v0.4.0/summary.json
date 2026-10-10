@@ -1,0 +1,23 @@
+{
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-7.0.0-1013-aws-x86_64-with-glibc2.39",
+  "PySide6": "6.11.2",
+  "full_suite": {
+    "tests": 189,
+    "failures": 0,
+    "errors": 0,
+    "exit_code": 0,
+    "seconds": 189.3
+  },
+  "final_targeted": {
+    "tests": 24,
+    "failures": 0,
+    "exit_code": 0,
+    "seconds": 22.53,
+    "new_boundary_tests": 4
+  },
+  "current_distinct_tests": 193,
+  "smoke_exit_code": 0,
+  "artifact_script_exit_code": 0,
+  "scope": "python-version only"
+}

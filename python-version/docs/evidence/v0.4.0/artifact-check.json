@@ -1,0 +1,12 @@
+{
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "excel_roundtrip": "passed",
+  "discard_keeps_original_file": "passed",
+  "screenshots": [
+    "precision.png",
+    "fields.png",
+    "text-field.png",
+    "save-project.png",
+    "save-prompt.png"
+  ]
+}

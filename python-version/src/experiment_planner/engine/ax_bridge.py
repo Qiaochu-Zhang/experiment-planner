@@ -12,7 +12,8 @@ from ax.storage.json_store.encoder import object_to_json
 
 def rebuild(template, records, name="local_experiment"):
     parameters = []
-    for p in template.parameters:
+    tracked = [p for p in template.parameters if p.get("value_type") != "text"]
+    for p in tracked:
         kind = {"float": ParameterType.FLOAT, "int": ParameterType.INT, "category": ParameterType.STRING, "bool": ParameterType.BOOL}[p.get("value_type", "float")]
         if "fixed_value" in p: parameter = FixedParameter(p["name"], kind, p["fixed_value"])
         elif "values" in p or kind == ParameterType.BOOL:
@@ -23,7 +24,7 @@ def rebuild(template, records, name="local_experiment"):
     experiment = Experiment(search_space=SearchSpace(parameters), name=name, tracking_metrics=[Metric(f["name"]) for f in template.responses], is_test=True)
     rows, mapping = [], {}
     for record in records:
-        arm = Arm(parameters=record["actual"])
+        arm = Arm(parameters={p["name"]: record["actual"][p["name"]] for p in tracked})
         # Ax names unique conditions, not individual experimental runs. Leave
         # repeated arms unnamed so Ax reuses the existing name, while each
         # business record keeps its own trial, status and measurement rows.

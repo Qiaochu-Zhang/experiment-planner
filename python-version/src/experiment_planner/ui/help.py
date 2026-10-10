@@ -84,6 +84,7 @@ def show_help(key="overview", parent=None):
 
 
 class HelpPopup(QFrame):
+    active_popup = None
     def __init__(self, key, parent=None, description=None, *, source=None, source_rect=None):
         super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
@@ -123,11 +124,16 @@ class HelpPopup(QFrame):
         if not self.cursor_inside(): self.hide()
 
     def showEvent(self, event):
+        previous = HelpPopup.active_popup() if HelpPopup.active_popup else None
+        if previous is not None and isValid(previous) and previous is not self:
+            previous.hide()
+        HelpPopup.active_popup = ref(self)
         super().showEvent(event)
         self.tracker.start()
         self.check_cursor()
 
     def hideEvent(self, event):
+        if HelpPopup.active_popup and HelpPopup.active_popup() is self: HelpPopup.active_popup = None
         self.timer.stop(); self.tracker.stop()
         super().hideEvent(event)
 

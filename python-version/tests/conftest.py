@@ -46,15 +46,23 @@ def qt_application():
     """One Qt application must outlive every widget in the test process."""
     import gc
     from PySide6.QtCore import QCoreApplication, QEvent
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QDialog
     app=QApplication.instance() or QApplication([])
     yield app
+    app.clipboard().clear()
     gc.collect()
     for widget in app.topLevelWidgets():
+        # Failed GUI assertions can leave a dirty draft open. Session cleanup
+        # must not enter a new modal confirmation after the tests have finished.
+        if isinstance(widget, QDialog): widget.accept()
+        if hasattr(widget, "service") and widget.service:
+            widget.service.project.close(); widget.service = None
         widget.close()
         widget.deleteLater()
     QCoreApplication.sendPostedEvents(None,QEvent.Type.DeferredDelete)
     app.processEvents()
+    from experiment_planner.ui.interaction import remove_wheel_filter
+    remove_wheel_filter()
 
 
 @pytest.fixture(autouse=True)

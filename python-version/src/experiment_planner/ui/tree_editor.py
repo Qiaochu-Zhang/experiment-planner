@@ -6,6 +6,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout
 
 from experiment_planner.domain.errors import ValidationError
+from experiment_planner.ui.interaction import DraftDialog, install_wheel_filter
+from experiment_planner.ui.help import attach_help
 
 TYPES = [("文本", "str"), ("数值", "float"), ("整数", "int"), ("开关", "bool"), ("未设置", "null"), ("属性组", "dict"), ("列表", "list")]
 LABELS = {"parameters":"工艺参数", "measurements":"原始测量", "derived_metrics":"派生指标 / 公式", "objectives":"优化目标", "optimization":"优化方式", "ratio_policy":"分母策略", "batch_defaults":"推荐默认设置", "knowledge_priors":"先验关系", "input_constraints":"输入约束", "outcome_constraints":"输出约束", "name":"内部名称", "label":"中文显示名称", "bounds":"范围 [下限，上限]", "expression":"计算公式", "value_type":"数据类型", "unit":"单位", "execution_rounding":"执行精度", "digits":"小数位数", "display_digits":"显示小数位数", "use_as_model_input":"作为模型输入", "is_response":"作为响应", "model_base":"直接建模", "note":"备注", "fixed_value":"固定值", "values":"离散取值", "enabled":"启用", "measured_at":"测量时点", "exploration_strength":"探索强度", "exploration_count":"专门探索名额"}
@@ -56,9 +58,10 @@ class ValueDialog(QDialog):
         self.accept()
 
 
-class JsonTreeEditor(QDialog):
+class JsonTreeEditor(DraftDialog):
     def __init__(self, data, parent=None, title="完整模板 · 逐项编辑"):
         super().__init__(parent)
+        install_wheel_filter()
         self.setWindowTitle(title); self.resize(1000,730)
         layout = QVBoxLayout(self)
         info = QLabel("双击属性修改。选择属性组或列表可添加子项；选择一项可删除。原有未知属性会保留。")
@@ -73,6 +76,8 @@ class JsonTreeEditor(QDialog):
             b=QPushButton(title);b.clicked.connect(action);actions.addWidget(b)
         buttons=chinese_buttons(QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel))
         buttons.accepted.connect(self.accept);buttons.rejected.connect(self.reject);layout.addWidget(buttons)
+        self.track_changes(self.data, self.accept)
+        attach_help(info, "template")
 
     def fill(self, parent, key, value):
         item=QTreeWidgetItem(parent)

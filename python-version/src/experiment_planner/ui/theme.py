@@ -6,6 +6,8 @@ from PySide6.QtCore import QLibraryInfo, QTranslator, QLocale
 
 def apply_light_theme():
     app = QApplication.instance()
+    from experiment_planner.ui.interaction import install_wheel_filter
+    install_wheel_filter()
     QLocale.setDefault(QLocale("zh_CN"))
     if not hasattr(app,"chinese_translator"):
         # Python owns this translator through the app attribute; giving it the

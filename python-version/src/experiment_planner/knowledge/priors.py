@@ -13,7 +13,7 @@ def check_capabilities(template, preset):
     if preset not in PRESETS or preset == "bernoulli_response_v1": raise CapabilityError("请选择数值模型预设；布尔模型按响应自动组合")
     base = {f["name"]: f for f in template.responses}
     inputs = {p["name"]: p for p in template.parameters}
-    if not any(p.get("use_as_model_input",True) for p in template.parameters):
+    if not any(p.get("value_type") != "text" and p.get("use_as_model_input",True) for p in template.parameters):
         raise CapabilityError("当前引擎至少需要一个模型输入")
     if any(f.get("use_as_model_input") for f in template.measurements + template.metrics):
         raise CapabilityError("当前引擎尚未支持额外实验前条件或派生输入；模板可保存，推荐已阻止")
@@ -21,6 +21,8 @@ def check_capabilities(template, preset):
         if not prior.get("enabled", True): continue
         if prior.get("response") not in base or prior.get("input") not in inputs:
             raise CapabilityError("先验必须指向可控输入与基础响应；派生先验需要专用适配")
+        if inputs[prior["input"]].get("value_type") == "text":
+            raise CapabilityError("文字输入不进入数值模型，不能设置模型先验")
         relation = prior.get("relation")
         if relation not in ("independent", "linear", "proportional", "monotonic", "weak"):
             raise CapabilityError("未实现此关系先验")

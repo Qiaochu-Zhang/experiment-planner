@@ -1,4 +1,30 @@
-# Python 源码版 0.3.0 验证报告
+# Python 源码版验证报告
+
+## 0.4.0 · 2026-10-10
+
+在 Linux / CPython 3.12.3 / Qt offscreen 环境验证。新增 Excel 模板定义、批量字段、文字输入、三个精度批量操作及桌面显式保存；仅修改 `python-version`。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| 完整回归 | **189 项通过，0 失败，退出码 0**，189.30 秒，14 条依赖弃用/数值提示。[日志](evidence/v0.4.0/python312-tests.txt)、[JUnit](evidence/v0.4.0/python312-tests.xml)。 |
+| 最终定向验证 | **24 项通过，0 失败，退出码 0**，22.53 秒；在完整回归启动后补充的 4 项边界测试也包括在内。覆盖 Excel 隐含模型角色不变、保存失败保留原文件、替换当前同名项目、另存覆盖且来源不变。与完整回归合计覆盖当前 193 个不同测试。[结果与环境](evidence/v0.4.0/summary.json)。 |
+| 桌面启动与退出 | `main.py --smoke` 正常退出，退出码 0。结构化字段剪贴板在退出前移交为 Qt 文本，避免 Python MIME 对象清理崩溃。 |
+| Excel 与界面 | 生成空白/完整 [Excel 示例](../examples/template_definitions/README.md)，实际导出再导入并计算公式；确认关闭放弃保留原项目文件。[脚本结果](evidence/v0.4.0/artifact-check.json)。已检查 [精度页](evidence/v0.4.0/precision.png)、[字段列表](evidence/v0.4.0/fields.png)、[文字输入](evidence/v0.4.0/text-field.png)、[项目保存入口](evidence/v0.4.0/save-project.png)、[保存提示](evidence/v0.4.0/save-prompt.png)。 |
+| 安装包 | 0.4.0 wheel 构建成功，全部 56 个包内源码/资源与当前目录逐字节一致。[检查记录](evidence/v0.4.0/wheel-check.json)。 |
+
+验证包含真实 Qt 鼠标 Shift/Ctrl 多选、快捷键跨区域粘贴、批量删除与引用清理、滚轮滚动外层容器而不改变控件值、说明互斥、统一显示位数不改执行精度、关闭模板/项目的保存/放弃/继续编辑、文字条件真实模型预测与 Ax 跟踪，以及手写中文 Excel、字面公式文本、草稿导入、会话保存/放弃、同名覆盖、外部改动保护和保存故障。
+
+本轮未重新验证 Python 3.13 或 Windows/macOS 人工图形操作。自定义单位仍按同名量纲处理，不自动解释复合单位；文字输入不进入数值模型。桌面显式保存使用工作副本，CLI/Python 记录服务继续立即提交事务。
+
+复现完整回归：
+
+```bash
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 .venv/bin/python -m pytest -c python-version/pyproject.toml python-version/tests -q -p no:cacheprovider
+```
+
+定向回归指定 `python-version/tests/integration/test_template_excel_session.py` 与 `python-version/tests/gui/test_template_workflow.py`。示例与截图复现：`QT_QPA_PLATFORM=offscreen .venv/bin/python python-version/scripts/validate_template_workflow.py`。
+
+## 0.3.0 历史验证
 
 本轮在 Linux x86_64、Qt offscreen 下使用合成数据验证，范围包括通用模板设计、字段增删改名、导入结束标记及原有功能回归。
 
