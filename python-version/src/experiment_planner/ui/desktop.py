@@ -17,6 +17,7 @@ from experiment_planner.io.exchange import preview_import, export_import_templat
 from experiment_planner.ui.window import MainWindow, button
 from experiment_planner.ui.template_editor import TemplateEditor
 from experiment_planner.ui.conditions import ConditionsForm
+from experiment_planner.ui.plot_ranges import PlotRangesForm
 from experiment_planner.ui.help import attach_help, help_label, show_help
 from experiment_planner.ui.tree_editor import chinese_buttons
 from experiment_planner.ui.messages import analysis_text
@@ -118,6 +119,15 @@ class PythonWindow(MainWindow):
         settings.addRow("趋势图响应/指标", self.plot_metric)
         choose_plot=QPushButton("选择趋势图变量 / 指标")
         choose_plot.clicked.connect(lambda:self.guard(self.choose_plot));settings.addRow(choose_plot)
+        self.plot_ranges = PlotRangesForm()
+        self.plot_variables.textChanged.connect(self.plot_ranges.set_variables)
+        settings.addRow("绘图范围", self.plot_ranges)
+        range_hint = QLabel("选择变量后可分别填写绘图下限、上限；留空使用模板范围。其余输入保持上方条件。")
+        range_hint.setWordWrap(True)
+        settings.addRow(range_hint)
+        reset_ranges = QPushButton("恢复模板全范围")
+        reset_ranges.clicked.connect(self.plot_ranges.reset)
+        settings.addRow(reset_ranges)
         self.analyze_button = QPushButton("按「下一批实验」所选模型预测 / 绘图")
         self.analyze_button.clicked.connect(lambda: self.guard(self.start_analysis))
         analysis_layout.addWidget(self.analyze_button)
@@ -228,6 +238,8 @@ class PythonWindow(MainWindow):
             key=(str(project.path),template.data["template_version"])
             if key!=self.loaded_template_key:
                 self.conditions.set_template(template)
+                self.plot_ranges.set_template(template)
+                self.plot_ranges.set_variables(self.plot_variables.text())
                 metrics=template.metrics or template.responses
                 if self.plot_metric.text() not in {f["name"] for f in template.fields}:
                     self.plot_metric.setText(metrics[0]["name"] if metrics else "")
@@ -268,7 +280,7 @@ class PythonWindow(MainWindow):
         self.loaded_template_key=None
         self.analysis_report=None
         if hasattr(self,"home_summary"):self.home_summary.setText("请新建或打开项目。")
-        for name in ("template_view", "conditions", "analysis_output", "plot_image"):
+        for name in ("template_view", "conditions", "plot_ranges", "plot_variables", "analysis_output", "plot_image"):
             if hasattr(self, name):
                 getattr(self, name).clear()
         return True
@@ -319,11 +331,12 @@ class PythonWindow(MainWindow):
         variables = [v.strip() for v in self.plot_variables.text().split(",") if v.strip()]
         if variables:
             from experiment_planner.plots.trends import slice_conditions
-            slice_conditions(project.template, condition, variables, points=15)
+            ranges = self.plot_ranges.values()
+            slice_conditions(project.template, condition, variables, points=15, ranges=ranges)
             path, _ = QFileDialog.getSaveFileName(self, "保存趋势图", "trend.png", "PNG (*.png)")
             if not path:
                 return
-            request.update(plot_path=path, variables=variables, metric=self.plot_metric.text().strip())
+            request.update(plot_path=path, variables=variables, metric=self.plot_metric.text().strip(), plot_ranges=ranges)
         self.analysis_template = project.template
         self.analysis_report = None
         self.analysis_task = CalculationTask(project, request, operation="analyze")
@@ -523,7 +536,7 @@ class PythonWindow(MainWindow):
 
     def choose_plot(self):
         template=self.require_project().template
-        selected=self.select_items("选择趋势图变量（最多两项）",[(p.get("label",p["name"]),p["name"]) for p in template.parameters if p.get("value_type","float") in ("float","int")],self.plot_variables.text().split(","))
+        selected=self.select_items("选择趋势图变量（最多两项）",[(p.get("label",p["name"]),p["name"]) for p in template.parameters if p.get("value_type","float") in ("float","int") and "bounds" in p],self.plot_variables.text().split(","))
         if selected is None:return
         if len(selected)>2:raise ValidationError("趋势图最多选择两个变量")
         self.plot_variables.setText(",".join(selected))

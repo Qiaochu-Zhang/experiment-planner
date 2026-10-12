@@ -10,6 +10,7 @@ from experiment_planner.domain.errors import CapabilityError, ValidationError
 from experiment_planner.domain.template import Template
 from experiment_planner.engine.models import BayesianLinear, Encoder, fit_models
 from experiment_planner.engine.objectives import Objectives, prediction_summary
+from experiment_planner.plots.trends import slice_conditions
 
 
 class FixedSamples:
@@ -157,3 +158,37 @@ def test_fit_linear_uses_squared_propagated_uncertainty(service, conditions):
     posterior = model.models[0].posterior(encoder.encode([{**conditions, "cl2_sccm": 40.0}]))
     assert posterior.mean.item() == pytest.approx(query @ coefficients, abs=1e-8)
     assert posterior.variance.item() == pytest.approx(query @ covariance @ query, abs=2e-9)
+
+
+@pytest.mark.model
+@pytest.mark.parametrize("preset", ["gp_rbf_v1", "gp_matern25_v1"])
+def test_low_noise_gp_is_precise_at_training_point_and_range_independent(preset):
+    template = Template({
+        "schema_version": 2, "template_version": 1, "name": "低噪声训练点检查",
+        "parameters": [{"name": "x", "unit": "1", "bounds": [0, 1]},
+                       {"name": "z", "unit": "1", "bounds": [0, 1]}],
+        "measurements": [{"name": "y", "unit": "1", "is_response": True}],
+        "derived_metrics": [], "objectives": [{"metric": "y", "direction": "maximize"}],
+        "optimization": {"mode": "single"}, "ratio_policy": {"mode": "remove"}})
+    records = [{"id": i, "status": "completed", "actual": {"x": x, "z": 0.5},
+                "derived": {}, "observations": {"y": {"value": 2 + 4*x,
+                    "uncertainty": {"kind": "std", "amount": 0.05}}}}
+               for i, x in enumerate([0, 0.25, 0.5, 0.75, 1], 1)]
+    model, encoder, _, datasets, _ = fit_models(template, records, preset)
+    baseline = {"x": 0.5, "z": 0.5}
+    exact = model.posterior(encoder.encode([baseline]))
+    assert datasets["y"]["count"] == 5
+    assert exact.mean.item() == pytest.approx(4.0, abs=0.1)
+    assert 2 * 1.96 * exact.variance.sqrt().item() < 0.25
+    off_slice = model.posterior(encoder.encode([{**baseline, "z": 1.0}]))
+    assert off_slice.variance.item() > exact.variance.item() * 4
+    # Compare exact marginals, not finite joint-sample quantiles: the same
+    # physical condition must keep its distribution in both display windows.
+    before = copy.deepcopy(template.data)
+    for bounds in ([0, 1], [0.25, 0.75]):
+        rows = slice_conditions(template, baseline, ["x"], points=5, ranges={"x": bounds})
+        index = rows.index(baseline)
+        posterior = model.posterior(encoder.encode(rows))
+        torch.testing.assert_close(posterior.mean[index], exact.mean[0], atol=1e-8, rtol=1e-8)
+        torch.testing.assert_close(posterior.variance[index], exact.variance[0], atol=1e-8, rtol=1e-8)
+    assert template.data == before

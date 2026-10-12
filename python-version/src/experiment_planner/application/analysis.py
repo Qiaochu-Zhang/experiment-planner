@@ -16,6 +16,10 @@ def analyze(snapshot, request):
     conditions = [template.validate_conditions(c) for c in conditions]
     preset = request.get("model", "gp_rbf_v1")
     seed = request.get("seed", 0)
+    if request.get("plot_path"):
+        from experiment_planner.plots.trends import slice_conditions
+        slice_conditions(template, conditions[0], request.get("variables", []),
+                         points=request.get("points", 15), ranges=request.get("plot_ranges"))
     model, encoder, names, datasets, notices = fit_models(
         template, snapshot["experiments"], preset, seed
     )
@@ -39,6 +43,7 @@ def analyze(snapshot, request):
             model, encoder, names, template, conditions[0],
             request.get("variables", []), request.get("metric", names[0]),
             request["plot_path"], snapshot["revision"], points=points, seed=seed,
+            ranges=request.get("plot_ranges"),
         )
         result["plot_path"] = str(request["plot_path"])
     for field in template.parameters:

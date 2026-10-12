@@ -1,5 +1,28 @@
 # Python 源码版验证报告
 
+## 绘图范围与预测问答 · 2026-10-12
+
+改动范围仅 `python-version`。在 Linux / CPython 3.12.3 / PySide6 6.11.2 / Qt offscreen 环境执行完整测试：**247 项通过，0 失败，0 跳过，退出码 0**，耗时 254.02 秒；14 条依赖弃用或数值稳定提示。[完整日志](evidence/trend-ranges-2026-10-12/tests.txt)、[JUnit](evidence/trend-ranges-2026-10-12/tests.xml)。
+
+| 验证 | 覆盖内容 |
+| --- | --- |
+| 绘图范围 | 一维/二维上下限、默认全范围、固定条件保持不变、模板不被修改；拒绝反序、相等、越界、非有限值和不属于图轴的范围字段。 |
+| 合法采样 | 取整后不超出自定义边界；整数输入与线性约束有效；没有合法条件或某轴不足两个不同取值时提示调整。 |
+| 界面与后台 | 范围输入与恢复默认、变量切换、项目关闭清理、界面向后台传参、分析进程实际出图且项目快照不变。 |
+| 图形输出 | 实际生成一维、二维 PNG；检查图轴上下限与请求一致，包括基准点位于窗口外的情形。导出仍沿用已有的缓存预测/图线导出路径。 |
+| 窗口布局 | 既有普通、小窗口、最大化、全屏、恢复、长名称、多字段及字号回归全部通过；增加对第二个绘图变量上限框可滚动访问的检查。另实际查看了 [1024×650 窗口的范围控件截图](evidence/trend-ranges-2026-10-12/range-controls.png)。 |
+| GP 训练点与范围 | 两种 GP 在 5 条响应标准不确定度为 0.05 的合成数据上，已测点解析均值距真值小于 0.1，中央 95% 区间宽度小于 0.25；离开另一个固定输入的训练切片后方差大于原值的 4 倍。宽/窄绘图窗口中同一条件的解析均值和方差一致。 |
+
+新增与扩展测试：[范围校验](../tests/unit/test_trend_ranges.py)、[范围表单及请求](../tests/gui/test_plot_ranges.py)、[出图](../tests/integration/test_worker_plots.py)、[后台分析](../tests/integration/test_python_edition.py)、[GP 机制](../tests/integration/test_prediction_validity.py)、[窗口布局](../tests/gui/test_window_layout.py)。回答见 [回答.md](../回答.md) 第 38–43 节。
+
+这些结果验证实现与受控场景；本轮没有取得问题中出现大偏差的真实项目，不能据此认定其预测可靠或确定异常原因。没有新增 GP 单调先验、自动异常点剔除或解析分位数显示。未执行 Windows 实机、Python 3.13 验证或重新构建安装包。
+
+复现（在 `python-version`，使用已安装依赖的解释器）：
+
+```bash
+python -m pytest -q -p no:cacheprovider --junitxml=docs/evidence/trend-ranges-2026-10-12/tests.xml
+```
+
 ## 0.4.2 · 2026-10-10
 
 在 Linux / CPython 3.12.3 / PySide6 6.11.2 / Qt offscreen 环境验证中文布尔选项、项目保存修复与窗口布局；仅修改 `python-version`。

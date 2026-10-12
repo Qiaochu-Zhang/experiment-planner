@@ -60,6 +60,7 @@ def test_prediction_layout_survives_window_states_and_large_plot(qt_application,
     window.service.add_record(values, measurements); window.refresh()
     window.table.setCurrentCell(0, 0); window.copy_conditions()
     assert window.conditions.values() == values
+    window.plot_variables.setText("cl2_sccm,rf_w")
     window.go_to(3); window.show(); qt_application.processEvents()
     if state == 'normal': window.resize(1280, 820)
     elif state == 'small': window.resize(1024, 650)
@@ -81,7 +82,13 @@ def test_prediction_layout_survives_window_states_and_large_plot(qt_application,
     assert inner.viewport().rect().contains(last.mapTo(inner.viewport(), last.rect().center()))
     outer.ensureWidgetVisible(window.plot_metric); qt_application.processEvents()
     assert outer.viewport().rect().contains(window.plot_metric.mapTo(outer.viewport(), window.plot_metric.rect().center()))
-    outer.ensureWidgetVisible(window.analysis_output); qt_application.processEvents()
+    last_range = window.plot_ranges.editors["rf_w"][1]
+    outer.ensureWidgetVisible(last_range); qt_application.processEvents()
+    assert outer.viewport().rect().contains(last_range.mapTo(outer.viewport(), last_range.rect().center()))
+    # QPlainTextEdit exposes its cursor rectangle to ensureWidgetVisible;
+    # explicitly scroll the center to check that the whole output is reachable.
+    center = window.analysis_output.mapTo(outer.widget(), window.analysis_output.rect().center())
+    outer.ensureVisible(center.x(), center.y()); qt_application.processEvents()
     assert outer.viewport().rect().contains(window.analysis_output.mapTo(outer.viewport(), window.analysis_output.rect().center()))
     window.close()
 

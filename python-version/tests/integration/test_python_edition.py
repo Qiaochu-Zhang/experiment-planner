@@ -61,6 +61,7 @@ def test_analysis_worker_does_not_write_project(service, tmp_path):
     task = CalculationTask(p, {
         "conditions": [p.experiments()[0]["actual"]], "model": "bayesian_linear_v1",
         "plot_path": str(path), "variables": ["cl2_sccm"], "metric": "sio2_loss_nm", "points": 4,
+        "plot_ranges": {"cl2_sccm": [12, 28]},
     }, operation="analyze")
     try:
         with pytest.raises(ValidationError):
@@ -79,6 +80,8 @@ def test_analysis_worker_does_not_write_project(service, tmp_path):
     assert "error" not in result, result
     assert result["result"]["revision"] == before["revision"]
     assert result["result"]["predictions"][0]["sio2_loss_nm"]["quantiles"]
+    assert result["result"]["plot"]["ranges"] == {"cl2_sccm": [12, 28]}
+    assert all(12 <= c["cl2_sccm"] <= 28 for c in result["result"]["plot"]["conditions"])
     assert path.stat().st_size > 1000
     assert p.snapshot() == before
 
