@@ -155,7 +155,13 @@ def fit_models(template, experiments, preset, seed=0):
         y = torch.tensor([r[1] for r in records], dtype=DTYPE).unsqueeze(-1)
         known = [r[2] is not None for r in records]
         if any(known) and not all(known):
-            raise CapabilityError(f"{name}：混合已知/未知观测噪声尚未适配，不能把未知误差当作零")
+            known_ids = [str(eid) for eid, has_error in zip(record_ids, known) if has_error]
+            unknown_ids = [str(eid) for eid, has_error in zip(record_ids, known) if not has_error]
+            raise CapabilityError(
+                f"{name}：混合已知/未知观测噪声尚未适配，不能把未知误差当作零。\n"
+                f"误差已知的实验：{'、'.join(known_ids)}；误差未知的实验：{'、'.join(unknown_ids)}。\n"
+                "可在“实验记录 → 统一设置误差”中按量测依据或明确假设补齐未知误差；"
+                "派生响应需补齐相关原始测量的误差。")
         variance = torch.tensor([r[2] for r in records], dtype=DTYPE).unsqueeze(-1).square() if all(known) else None
         priors = [p for p in template.data.get("knowledge_priors", []) if p.get("enabled", True) and p["response"] == name]
         excluded = {i for p in priors if p["relation"] == "independent" for i in encoder.indices.get(p["input"], [])}

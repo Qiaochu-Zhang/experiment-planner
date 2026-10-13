@@ -1,5 +1,37 @@
 # Python 源码版验证报告
 
+## 统一设置测量误差 · 2026-10-13
+
+在本目录独立环境 Linux / CPython 3.12.3 / PySide6 6.12.0 / Qt offscreen 下完成 **279 项不同测试，0 失败、0 跳过**。依赖版本及环境见 [环境记录](evidence/uniform-uncertainty-2026-10-13/environment.json)。最终按下面四组运行，各组进程退出码均为 0：
+
+| 验证组 | 实际结果与证据 |
+| --- | --- |
+| 全部单元与集成测试，先分离两个后台进程文件 | **224 passed**，66.13 秒；14 条警告为依赖弃用与原有矩阵 jitter 提示。[日志](evidence/uniform-uncertainty-2026-10-13/core-tests.txt)、[JUnit](evidence/uniform-uncertainty-2026-10-13/core-tests.xml)。 |
+| 后台异常、进程意外退出、警告保留 | **6 passed**，20.31 秒，2 条依赖弃用警告。[日志](evidence/uniform-uncertainty-2026-10-13/worker-tests.txt)、[JUnit](evidence/uniform-uncertainty-2026-10-13/worker-tests.xml)。 |
+| 取消后台任务与一/二维绘图 | **3 passed**，8.49 秒。[日志](evidence/uniform-uncertainty-2026-10-13/plot-tests.txt)、[JUnit](evidence/uniform-uncertainty-2026-10-13/plot-tests.xml)。 |
+| 新设置弹窗、失败诊断、窗口布局、撤销导出、多选删除及原型窗口 | **46 passed**，209.06 秒。[日志](evidence/uniform-uncertainty-2026-10-13/gui-tests.txt)、[JUnit](evidence/uniform-uncertainty-2026-10-13/gui-tests.xml)。 |
+
+新增测试共 **31 项**（服务/模型 18 项，GUI 13 项），已包含在上述 279 项中，不重复累加。定向测试先通过 31 项；检查截图后，修正标准按钮在显示时被自动改回“保存”的问题，改用明确的“应用设置”，再完成 13 项 GUI 定向复测与上面的最终回归。[初次定向日志](evidence/uniform-uncertainty-2026-10-13/focused-tests.txt)、[按钮修正后的日志](evidence/uniform-uncertainty-2026-10-13/final-ui-tests.txt)。
+
+验证内容包含：选中/全部范围及测量字段选择；仅补齐未知、保留可换算误差、替换区间含义、跳过未测；保留实际测量、备注、记录身份、导入身份、批次/复测信息及共享误差来源；独立/相关差值误差重算；一次版本变化与整批撤销/重做；中途写入失败整批回滚；预览过期拒绝提交；无修改不产生历史；桌面工作副本保存与重新打开。界面通过真实按钮进入弹窗，验证应用、取消、单位与预览数量。
+
+两种真实 GP（RBF 与 Matérn）均验证了：部分已知时错误包含已知/未知实验编号；显式补齐后拟合成功；同条件 10/14 的合成测量，把较小误差分别赋予其中一条后，预测分别靠近该条记录（距离小于 0.5），原始测量值保持不变。这仅证明设置进入似然并影响预测，不是实际设备误差或预测准确率的标定。
+
+[已实际查看的弹窗截图](evidence/uniform-uncertainty-2026-10-13/dialog.png) 使用合成数据，显示 3 条实验 / 10 项将修改、保留已有误差 2 项、跳过未测 4 项。截图生成有离屏平台和字体缓存提示，图片与“应用设置”按钮已检查。
+
+首轮测试因两个新增文件同名而发生 pytest 收集冲突，已将 GUI 文件改名为 `test_measurement_uncertainty_ui.py`：[初次诊断](evidence/uniform-uncertainty-2026-10-13/initial-collection.txt)。随后两次较大组合运行以退出码 143 中止，日志没有给出终止原因，未产生最终 JUnit 汇总，**不计作通过**；保留 [组合运行输出](evidence/uniform-uncertainty-2026-10-13/interrupted-regression.txt) 与 [核心组合输出](evidence/uniform-uncertainty-2026-10-13/interrupted-core.txt)。拆分后的四组覆盖原计划全部 279 项并取得上表通过结果，没有跳过相关测试。
+
+复现四组（工作目录 `python-version`，设置 `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen`）：
+
+```bash
+.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit tests/integration --ignore=tests/integration/test_worker_failures.py --ignore=tests/integration/test_worker_plots.py
+.venv/bin/python -m pytest -q -p no:cacheprovider tests/integration/test_worker_failures.py
+.venv/bin/python -m pytest -q -p no:cacheprovider tests/integration/test_worker_plots.py
+.venv/bin/python -m pytest -q -p no:cacheprovider tests/gui/test_measurement_uncertainty_ui.py tests/gui/test_failure_diagnostics.py tests/gui/test_window_layout.py tests/gui/test_history_export_ui.py tests/gui/test_v021_desktop.py tests/gui/test_window.py
+```
+
+没有 Windows 实机、Python 3.13 或用户真实项目数据验证；未运行上述文件之外的其他 GUI 测试。全部未知/全部已知噪声的建模限制、相关似然限制及显式保存机制保持现有行为。
+
 ## GP 拟合诊断与恢复 · 2026-10-13
 
 在 `python-version/.venv` 的 Linux / CPython 3.12.3 / PySide6 6.12.0 / Qt offscreen 环境验证，BoTorch 0.18.1、GPyTorch 1.15.2、PyTorch 2.8.0+cpu、SciPy 1.18.1。[环境记录](evidence/gp-fitting-diagnostics-2026-10-13/environment.json)。

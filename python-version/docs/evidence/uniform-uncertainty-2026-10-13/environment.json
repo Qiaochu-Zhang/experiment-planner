@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-13",
+  "python": "3.12.3",
+  "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+  "qt_platform": "offscreen",
+  "dependencies": {
+    "botorch": "0.18.1",
+    "gpytorch": "1.15.2",
+    "torch": "2.8.0+cpu",
+    "scipy": "1.18.1",
+    "PySide6": "6.12.0",
+    "pytest": "9.1.1"
+  },
+  "data": "Synthetic test records only; no user project data",
+  "windows_validation": false
+}

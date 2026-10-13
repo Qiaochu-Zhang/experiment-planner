@@ -1,0 +1,56 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /home/ubuntu/projects/experiment-planner/python-version/.venv/bin/python
+rootdir: /home/ubuntu/projects/experiment-planner/python-version
+configfile: pyproject.toml
+plugins: platformdirs-4.13.0
+collecting ... collected 46 items
+
+tests/gui/test_measurement_uncertainty_ui.py::test_invalid_amount_disables_apply[] PASSED [  2%]
+tests/gui/test_measurement_uncertainty_ui.py::test_invalid_amount_disables_apply[abc] PASSED [  4%]
+tests/gui/test_measurement_uncertainty_ui.py::test_invalid_amount_disables_apply[0] PASSED [  6%]
+tests/gui/test_measurement_uncertainty_ui.py::test_invalid_amount_disables_apply[-1] PASSED [  8%]
+tests/gui/test_measurement_uncertainty_ui.py::test_invalid_amount_disables_apply[nan] PASSED [ 10%]
+tests/gui/test_measurement_uncertainty_ui.py::test_invalid_amount_disables_apply[inf] PASSED [ 13%]
+tests/gui/test_measurement_uncertainty_ui.py::test_invalid_amount_disables_apply[1e200] PASSED [ 15%]
+tests/gui/test_measurement_uncertainty_ui.py::test_invalid_amount_disables_apply[1e-200] PASSED [ 17%]
+tests/gui/test_measurement_uncertainty_ui.py::test_preview_scope_fields_only_unknown_and_no_mutation PASSED [ 19%]
+tests/gui/test_measurement_uncertainty_ui.py::test_numeric_fields_units_and_empty_project PASSED [ 21%]
+tests/gui/test_measurement_uncertainty_ui.py::test_real_button_dialog_apply_cancel_and_undo[selected-True] PASSED [ 23%]
+tests/gui/test_measurement_uncertainty_ui.py::test_real_button_dialog_apply_cancel_and_undo[all-True] PASSED [ 26%]
+tests/gui/test_measurement_uncertainty_ui.py::test_real_button_dialog_apply_cancel_and_undo[all-False] PASSED [ 28%]
+tests/gui/test_failure_diagnostics.py::test_worker_failure_is_readable_copyable_and_reopenable[generate] PASSED [ 30%]
+tests/gui/test_failure_diagnostics.py::test_worker_failure_is_readable_copyable_and_reopenable[analyze] PASSED [ 32%]
+tests/gui/test_failure_diagnostics.py::test_start_failure_retains_chained_exception_and_next_failure_replaces_it PASSED [ 34%]
+tests/gui/test_failure_diagnostics.py::test_poll_exception_stops_timer_and_keeps_diagnostic[generate] PASSED [ 36%]
+tests/gui/test_failure_diagnostics.py::test_poll_exception_stops_timer_and_keeps_diagnostic[analyze] PASSED [ 39%]
+tests/gui/test_failure_diagnostics.py::test_missing_diagnostic_is_explicit_and_success_does_not_erase_last_failure PASSED [ 41%]
+tests/gui/test_failure_diagnostics.py::test_analysis_result_rendering_failure_has_diagnostics PASSED [ 43%]
+tests/gui/test_failure_diagnostics.py::test_recommendation_commit_failure_has_diagnostics PASSED [ 45%]
+tests/gui/test_failure_diagnostics.py::test_configuration_failure_before_calculation_has_details PASSED [ 47%]
+tests/gui/test_failure_diagnostics.py::test_training_failure_context_and_warning_can_be_copied_and_reopened PASSED [ 50%]
+tests/gui/test_window_layout.py::test_conditions_wrap_and_scroll_without_clipping[420-300] PASSED [ 52%]
+tests/gui/test_window_layout.py::test_conditions_wrap_and_scroll_without_clipping[640-480] PASSED [ 54%]
+tests/gui/test_window_layout.py::test_conditions_wrap_and_scroll_without_clipping[900-650] PASSED [ 56%]
+tests/gui/test_window_layout.py::test_prediction_layout_survives_window_states_and_large_plot[normal] PASSED [ 58%]
+tests/gui/test_window_layout.py::test_prediction_layout_survives_window_states_and_large_plot[small] PASSED [ 60%]
+tests/gui/test_window_layout.py::test_prediction_layout_survives_window_states_and_large_plot[maximized] PASSED [ 63%]
+tests/gui/test_window_layout.py::test_prediction_layout_survives_window_states_and_large_plot[fullscreen] PASSED [ 65%]
+tests/gui/test_window_layout.py::test_prediction_layout_survives_window_states_and_large_plot[restored] PASSED [ 67%]
+tests/gui/test_window_layout.py::test_larger_fonts_keep_prediction_and_template_controls_readable[1.0] PASSED [ 69%]
+tests/gui/test_window_layout.py::test_larger_fonts_keep_prediction_and_template_controls_readable[1.5] PASSED [ 71%]
+tests/gui/test_window_layout.py::test_larger_fonts_keep_prediction_and_template_controls_readable[2.0] PASSED [ 73%]
+tests/gui/test_history_export_ui.py::test_keyboard_undo_redo_deleted_record[False] PASSED [ 76%]
+tests/gui/test_history_export_ui.py::test_keyboard_undo_redo_deleted_record[True] PASSED [ 78%]
+tests/gui/test_history_export_ui.py::test_text_undo_does_not_change_database PASSED [ 80%]
+tests/gui/test_history_export_ui.py::test_response_precision_saves_and_formats_prediction PASSED [ 82%]
+tests/gui/test_history_export_ui.py::test_template_fields_do_not_get_generic_popups PASSED [ 84%]
+tests/gui/test_v021_desktop.py::test_mouse_selection_and_delete_confirmation[selected0-True] PASSED [ 86%]
+tests/gui/test_v021_desktop.py::test_mouse_selection_and_delete_confirmation[selected1-True] PASSED [ 89%]
+tests/gui/test_v021_desktop.py::test_mouse_selection_and_delete_confirmation[selected2-False] PASSED [ 91%]
+tests/gui/test_v021_desktop.py::test_import_is_default_and_upgrade_preserves_other_favorites PASSED [ 93%]
+tests/gui/test_v021_desktop.py::test_help_disappears_after_one_second_but_popup_remains_clickable PASSED [ 95%]
+tests/gui/test_v021_desktop.py::test_header_help_closes_when_pointer_moves_to_another_column PASSED [ 97%]
+tests/gui/test_window.py::test_minimal_window_records_restore PASSED     [100%]
+
+- generated xml file: /home/ubuntu/projects/experiment-planner/python-version/docs/evidence/uniform-uncertainty-2026-10-13/gui-tests.xml -
+======================== 46 passed in 209.06s (0:03:29) ========================

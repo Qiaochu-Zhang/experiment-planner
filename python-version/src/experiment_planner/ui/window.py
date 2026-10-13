@@ -17,6 +17,7 @@ from experiment_planner.precision.rounding import display
 from experiment_planner.ui.help import attach_help, help_label, HelpFilter
 from experiment_planner.ui.messages import user_error, batch_text, exception_diagnostic
 from experiment_planner.ui.diagnostics import show_failure_dialog
+from experiment_planner.ui.measurement_uncertainty import MeasurementUncertaintyDialog
 from experiment_planner.ui.tree_editor import chinese_buttons, JsonTreeEditor
 
 
@@ -129,6 +130,8 @@ class MainWindow(QMainWindow):
         records=QWidget();record_layout=QVBoxLayout(records);actions=QHBoxLayout();record_layout.addLayout(actions)
         button("录入实验",lambda:self.guard(self.add_record),actions)
         button("更正选中实验 / 回填",lambda:self.guard(self.edit_record),actions)
+        self.uncertainty_button = button("统一设置误差", lambda:self.guard(self.set_measurement_uncertainty), actions)
+        attach_help(self.uncertainty_button, "uncertainty")
         attach_help(button("删除选中实验",lambda:self.guard(self.delete_records),actions),"delete_records")
         self.table=QTableWidget();self.table.setSelectionBehavior(QAbstractItemView.SelectRows);self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -296,6 +299,19 @@ class MainWindow(QMainWindow):
         if row<0:raise ValidationError("请先选择实验行")
         eid=int(self.table.item(row,0).text());dialog=RecordDialog(p.template,p.experiment(eid),self)
         if dialog.exec():self.service.revise_record(eid,**dialog.values());self.refresh()
+
+    def set_measurement_uncertainty(self):
+        p = self.require_project()
+        with p.transaction():
+            records, revision, template = p.experiments(), p.revision, p.template
+        if not records:
+            raise ValidationError("请先录入或导入实验记录")
+        selected = [int(self.table.item(row.row(), 0).text()) for row in self.table.selectionModel().selectedRows()]
+        dialog = MeasurementUncertaintyDialog(template, records, selected, self)
+        if dialog.exec():
+            summary = self.service.set_measurement_uncertainty(**dialog.values(), expected_revision=revision)
+            self.refresh()
+            self.statusBar().showMessage(f"已更新 {summary['changed_records']} 条实验、{summary['changed_cells']} 项测量误差；可 Ctrl+Z 撤销，Ctrl+S 保存项目。", 15000)
 
     def delete_records(self):
         p = self.require_project()

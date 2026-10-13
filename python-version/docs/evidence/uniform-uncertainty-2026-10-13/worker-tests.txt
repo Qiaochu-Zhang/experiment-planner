@@ -1,0 +1,26 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /home/ubuntu/projects/experiment-planner/python-version/.venv/bin/python
+rootdir: /home/ubuntu/projects/experiment-planner/python-version
+configfile: pyproject.toml
+plugins: platformdirs-4.13.0
+collecting ... collected 6 items
+
+tests/integration/test_worker_failures.py::test_spawned_worker_returns_original_exception_and_traceback[generate] PASSED [ 16%]
+tests/integration/test_worker_failures.py::test_spawned_worker_returns_original_exception_and_traceback[analyze] PASSED [ 33%]
+tests/integration/test_worker_failures.py::test_abrupt_worker_exit_has_readable_exit_diagnostic_and_releases_lock[generate] PASSED [ 50%]
+tests/integration/test_worker_failures.py::test_abrupt_worker_exit_has_readable_exit_diagnostic_and_releases_lock[analyze] PASSED [ 66%]
+tests/integration/test_worker_failures.py::test_worker_retains_pre_failure_warnings_and_training_context[generate] PASSED [ 83%]
+tests/integration/test_worker_failures.py::test_worker_retains_pre_failure_warnings_and_training_context[analyze] PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/integration/test_worker_failures.py::test_worker_retains_pre_failure_warnings_and_training_context[generate]
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117: DeprecationWarning: ax.service.utils.orchestrator_options has been moved to ax.orchestration.orchestrator_options. Please update imports to use: from ax.orchestration.orchestrator_options import OrchestratorOptions, TrialType. This backward compatibility shim will be removed in a future release.
+    from ax.service.utils.orchestrator_options import OrchestratorOptions, TrialType
+
+tests/integration/test_worker_failures.py::test_worker_retains_pre_failure_warnings_and_training_context[generate]
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39: DeprecationWarning: ax.service.orchestrator has been moved to ax.orchestration.orchestrator. Please update imports to use: from ax.orchestration.orchestrator import Orchestrator. This backward compatibility shim will be removed in a future release.
+    from ax.service.orchestrator import OrchestratorOptions
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /home/ubuntu/projects/experiment-planner/python-version/docs/evidence/uniform-uncertainty-2026-10-13/worker-tests.xml -
+======================== 6 passed, 2 warnings in 20.31s ========================

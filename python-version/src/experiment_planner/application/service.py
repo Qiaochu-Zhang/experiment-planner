@@ -4,6 +4,7 @@ import uuid
 from functools import wraps
 
 from experiment_planner.application.records import derive, normalize_observations
+from experiment_planner.application.measurement_uncertainty import plan_standard_uncertainty
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.storage.project import Project, encode, now
 
@@ -102,6 +103,31 @@ class PlannerService:
             p.db.execute("UPDATE experiments SET payload=? WHERE id=?", (encode(new), experiment_id))
             p.bump()
             p.log("experiment", experiment_id, old, new)
+
+    @reversible
+    def set_measurement_uncertainty(self, experiment_ids, measurement_names, amount, *,
+                                    only_unknown=False, expected_revision=None):
+        """Apply one reversible, audited bulk edit to existing measured cells."""
+        ids = list(experiment_ids)
+        if not ids or any(type(eid) is not int or eid <= 0 for eid in ids):
+            raise ValidationError("请选择至少一条有效实验记录")
+        ids = list(dict.fromkeys(ids))
+        p = self.project
+        with p.transaction(self._action_revision if expected_revision is None else expected_revision):
+            template = p.template
+            plan = plan_standard_uncertainty(template, [p.experiment(eid) for eid in ids],
+                                             measurement_names, amount, only_unknown=only_unknown)
+            for _, new in plan.changes:
+                new["derived"] = derive(template, new["actual"], new["observations"])
+                new["template_version"] = template.data["template_version"]
+                new["updated"] = now()
+            if plan.changes:
+                p.bump()
+                for old, new in plan.changes:
+                    eid = new.pop("id")
+                    p.db.execute("UPDATE experiments SET payload=? WHERE id=?", (encode(new), eid))
+                    p.log("measurement_uncertainty", eid, old, new)
+        return plan.summary()
 
     @reversible
     def delete_records(self, experiment_ids, expected_revision=None):

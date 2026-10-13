@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="0" skipped="0" tests="1" time="2.901" timestamp="2026-10-13T03:59:08.453800+00:00" hostname="ip-172-31-25-134"><testcase classname="" name="tests.gui.test_measurement_uncertainty" time="0.000"><error message="collection failure">import file mismatch:
+imported module 'test_measurement_uncertainty' has this __file__ attribute:
+  /home/ubuntu/projects/experiment-planner/python-version/tests/integration/test_measurement_uncertainty.py
+which is not the same as the test file we want to collect:
+  /home/ubuntu/projects/experiment-planner/python-version/tests/gui/test_measurement_uncertainty.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules</error></testcase></testsuite></testsuites>
