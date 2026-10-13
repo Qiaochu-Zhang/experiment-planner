@@ -1,0 +1,438 @@
+{
+  "purpose": "Inspect defaults and four synthetic fits; not the user project or its fitted values.",
+  "versions": {
+    "botorch": "0.18.1",
+    "gpytorch": "1.15.2",
+    "torch": "2.8.0+cpu",
+    "scipy": "1.18.1"
+  },
+  "synthetic_inputs": [
+    [
+      0,
+      0
+    ],
+    [
+      2,
+      1
+    ],
+    [
+      4,
+      0
+    ],
+    [
+      6,
+      1
+    ],
+    [
+      8,
+      0
+    ],
+    [
+      10,
+      1
+    ]
+  ],
+  "response_formula": "2 + .4*x + .03*x*x + .7*z + small deterministic offsets",
+  "fits": [
+    {
+      "before": {
+        "parameters": {
+          "likelihood.noise_covar.raw_noise": {
+            "shape": [
+              1
+            ],
+            "requires_grad": true
+          },
+          "mean_module.raw_constant": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.raw_outputscale": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.base_kernel.raw_lengthscale": {
+            "shape": [
+              1,
+              2
+            ],
+            "requires_grad": true
+          }
+        },
+        "trainable_scalar_count": 5,
+        "lengthscale": [
+          0.6931471805599453,
+          0.6931471805599453
+        ],
+        "outputscale": 0.6931471805599453,
+        "constant_mean": 0.0,
+        "noise_variance": [
+          0.0067379469983279705
+        ],
+        "likelihood": "GaussianLikelihood",
+        "priors": {
+          "likelihood.noise_covar.noise_prior": "LogNormalPrior()"
+        },
+        "constraints": {
+          "likelihood.noise_covar.raw_noise_constraint": "GreaterThan(1.000E-04)",
+          "covar_module.raw_outputscale_constraint": "Positive()",
+          "covar_module.base_kernel.raw_lengthscale_constraint": "Positive()"
+        },
+        "outcome_mean": 5.449999999999999,
+        "outcome_std": 2.7634471227074346
+      },
+      "fit_options": {
+        "optimizer_kwargs": {
+          "options": {
+            "maxiter": 100
+          }
+        }
+      },
+      "after": {
+        "parameters": {
+          "likelihood.noise_covar.raw_noise": {
+            "shape": [
+              1
+            ],
+            "requires_grad": true
+          },
+          "mean_module.raw_constant": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.raw_outputscale": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.base_kernel.raw_lengthscale": {
+            "shape": [
+              1,
+              2
+            ],
+            "requires_grad": true
+          }
+        },
+        "trainable_scalar_count": 5,
+        "lengthscale": [
+          1.6329008274067691,
+          14.7288799211227
+        ],
+        "outputscale": 9.728595830958856,
+        "constant_mean": 1.738367011917414,
+        "noise_variance": [
+          0.0035610781232990273
+        ],
+        "likelihood": "GaussianLikelihood",
+        "priors": {
+          "likelihood.noise_covar.noise_prior": "LogNormalPrior()"
+        },
+        "constraints": {
+          "likelihood.noise_covar.raw_noise_constraint": "GreaterThan(1.000E-04)",
+          "covar_module.raw_outputscale_constraint": "Positive()",
+          "covar_module.base_kernel.raw_lengthscale_constraint": "Positive()"
+        },
+        "outcome_mean": 5.449999999999999,
+        "outcome_std": 2.7634471227074346
+      },
+      "preset": "gp_rbf_v1",
+      "known_noise": false,
+      "warnings": []
+    },
+    {
+      "before": {
+        "parameters": {
+          "mean_module.raw_constant": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.raw_outputscale": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.base_kernel.raw_lengthscale": {
+            "shape": [
+              1,
+              2
+            ],
+            "requires_grad": true
+          }
+        },
+        "trainable_scalar_count": 4,
+        "lengthscale": [
+          0.6931471805599453,
+          0.6931471805599453
+        ],
+        "outputscale": 0.6931471805599453,
+        "constant_mean": 0.0,
+        "noise_variance": [
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648
+        ],
+        "likelihood": "FixedNoiseGaussianLikelihood",
+        "priors": {},
+        "constraints": {
+          "covar_module.raw_outputscale_constraint": "Positive()",
+          "covar_module.base_kernel.raw_lengthscale_constraint": "Positive()"
+        },
+        "outcome_mean": 5.449999999999999,
+        "outcome_std": 2.7634471227074346
+      },
+      "fit_options": {
+        "optimizer_kwargs": {
+          "options": {
+            "maxiter": 100
+          }
+        }
+      },
+      "after": {
+        "parameters": {
+          "mean_module.raw_constant": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.raw_outputscale": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.base_kernel.raw_lengthscale": {
+            "shape": [
+              1,
+              2
+            ],
+            "requires_grad": true
+          }
+        },
+        "trainable_scalar_count": 4,
+        "lengthscale": [
+          1.9721585324312096,
+          19.850584102839456
+        ],
+        "outputscale": 16.297025529323296,
+        "constant_mean": 2.625648067602943,
+        "noise_variance": [
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648
+        ],
+        "likelihood": "FixedNoiseGaussianLikelihood",
+        "priors": {},
+        "constraints": {
+          "covar_module.raw_outputscale_constraint": "Positive()",
+          "covar_module.base_kernel.raw_lengthscale_constraint": "Positive()"
+        },
+        "outcome_mean": 5.449999999999999,
+        "outcome_std": 2.7634471227074346
+      },
+      "preset": "gp_rbf_v1",
+      "known_noise": true,
+      "warnings": []
+    },
+    {
+      "before": {
+        "parameters": {
+          "likelihood.noise_covar.raw_noise": {
+            "shape": [
+              1
+            ],
+            "requires_grad": true
+          },
+          "mean_module.raw_constant": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.raw_outputscale": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.base_kernel.raw_lengthscale": {
+            "shape": [
+              1,
+              2
+            ],
+            "requires_grad": true
+          }
+        },
+        "trainable_scalar_count": 5,
+        "lengthscale": [
+          0.6931471805599453,
+          0.6931471805599453
+        ],
+        "outputscale": 0.6931471805599453,
+        "constant_mean": 0.0,
+        "noise_variance": [
+          0.0067379469983279705
+        ],
+        "likelihood": "GaussianLikelihood",
+        "priors": {
+          "likelihood.noise_covar.noise_prior": "LogNormalPrior()"
+        },
+        "constraints": {
+          "likelihood.noise_covar.raw_noise_constraint": "GreaterThan(1.000E-04)",
+          "covar_module.raw_outputscale_constraint": "Positive()",
+          "covar_module.base_kernel.raw_lengthscale_constraint": "Positive()"
+        },
+        "outcome_mean": 5.449999999999999,
+        "outcome_std": 2.7634471227074346
+      },
+      "fit_options": {
+        "optimizer_kwargs": {
+          "options": {
+            "maxiter": 100
+          }
+        }
+      },
+      "after": {
+        "parameters": {
+          "likelihood.noise_covar.raw_noise": {
+            "shape": [
+              1
+            ],
+            "requires_grad": true
+          },
+          "mean_module.raw_constant": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.raw_outputscale": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.base_kernel.raw_lengthscale": {
+            "shape": [
+              1,
+              2
+            ],
+            "requires_grad": true
+          }
+        },
+        "trainable_scalar_count": 5,
+        "lengthscale": [
+          2.8302223239103093,
+          24.76548406244934
+        ],
+        "outputscale": 15.963856552452008,
+        "constant_mean": 1.566426896336432,
+        "noise_variance": [
+          0.003833627364410012
+        ],
+        "likelihood": "GaussianLikelihood",
+        "priors": {
+          "likelihood.noise_covar.noise_prior": "LogNormalPrior()"
+        },
+        "constraints": {
+          "likelihood.noise_covar.raw_noise_constraint": "GreaterThan(1.000E-04)",
+          "covar_module.raw_outputscale_constraint": "Positive()",
+          "covar_module.base_kernel.raw_lengthscale_constraint": "Positive()"
+        },
+        "outcome_mean": 5.449999999999999,
+        "outcome_std": 2.7634471227074346
+      },
+      "preset": "gp_matern25_v1",
+      "known_noise": false,
+      "warnings": []
+    },
+    {
+      "before": {
+        "parameters": {
+          "mean_module.raw_constant": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.raw_outputscale": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.base_kernel.raw_lengthscale": {
+            "shape": [
+              1,
+              2
+            ],
+            "requires_grad": true
+          }
+        },
+        "trainable_scalar_count": 4,
+        "lengthscale": [
+          0.6931471805599453,
+          0.6931471805599453
+        ],
+        "outputscale": 0.6931471805599453,
+        "constant_mean": 0.0,
+        "noise_variance": [
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648
+        ],
+        "likelihood": "FixedNoiseGaussianLikelihood",
+        "priors": {},
+        "constraints": {
+          "covar_module.raw_outputscale_constraint": "Positive()",
+          "covar_module.base_kernel.raw_lengthscale_constraint": "Positive()"
+        },
+        "outcome_mean": 5.449999999999999,
+        "outcome_std": 2.7634471227074346
+      },
+      "fit_options": {
+        "optimizer_kwargs": {
+          "options": {
+            "maxiter": 100
+          }
+        }
+      },
+      "after": {
+        "parameters": {
+          "mean_module.raw_constant": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.raw_outputscale": {
+            "shape": [],
+            "requires_grad": true
+          },
+          "covar_module.base_kernel.raw_lengthscale": {
+            "shape": [
+              1,
+              2
+            ],
+            "requires_grad": true
+          }
+        },
+        "trainable_scalar_count": 4,
+        "lengthscale": [
+          3.477433694400625,
+          33.17968102858447
+        ],
+        "outputscale": 26.38541491644504,
+        "constant_mean": 2.316403319061302,
+        "noise_variance": [
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648,
+          0.001309476418948648
+        ],
+        "likelihood": "FixedNoiseGaussianLikelihood",
+        "priors": {},
+        "constraints": {
+          "covar_module.raw_outputscale_constraint": "Positive()",
+          "covar_module.base_kernel.raw_lengthscale_constraint": "Positive()"
+        },
+        "outcome_mean": 5.449999999999999,
+        "outcome_std": 2.7634471227074346
+      },
+      "preset": "gp_matern25_v1",
+      "known_noise": true,
+      "warnings": []
+    }
+  ]
+}
