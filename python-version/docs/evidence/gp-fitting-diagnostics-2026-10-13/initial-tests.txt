@@ -1,0 +1,88 @@
+........................................................................ [ 32%]
+.......F................................................................ [ 64%]
+........................................................................ [ 96%]
+.........                                                                [100%]
+=================================== FAILURES ===================================
+________ test_old_experiment_metadata_does_not_select_models_or_inputs _________
+
+    def test_old_experiment_metadata_does_not_select_models_or_inputs():
+        data = blank_template()
+        data['parameters'] = [{'name': 'speed', 'bounds': [0, 10]}]
+        data['measurements'] = [{'name': 'quality', 'is_response': True, 'model_base': True}]
+        data['objectives'] = [{'metric': 'quality', 'direction': 'maximize'}]
+        clean = Template(data)
+        old = copy.deepcopy(data)
+        old['modeling'] = {'base_responses': ['sio2_loss_nm', 'sin_loss_nm']}
+        old['context_assumptions'] = [{'field': 'speed', 'response': 'quality', 'assumption': 'not_used_as_response_model_input'}]
+        stale = Template(old)
+        records = [{'actual': {'speed': x}, 'status': 'completed', 'observations': {'quality': {'value': 2 * x + 1, 'uncertainty': {}}}, 'derived': {}} for x in (1, 3, 6)]
+        for template in (clean, stale):
+            assert [f['name'] for f in template.responses] == ['quality']
+            assert Encoder(template).width == 1
+>           _, encoder, names, _, _ = fit_models(template, records, 'bayesian_linear_v1')
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/test_excel_guidance.py:205:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+template = <experiment_planner.domain.template.Template object at 0x7ddfacb18da0>
+experiments = [{'actual': {'speed': 1}, 'status': 'completed', 'observations': {'quality': {'value': 3, 'uncertainty': {}}}, 'derive...l': {'speed': 6}, 'status': 'completed', 'observations': {'quality': {'value': 13, 'uncertainty': {}}}, 'derived': {}}]
+preset = 'bayesian_linear_v1', seed = 0
+
+    def fit_models(template, experiments, preset, seed=0):
+        check_capabilities(template, preset)
+        source_usage={}
+        def raw_dependencies(name):
+            if name not in template.graph.formulas:return {name}
+            return set().union(*(raw_dependencies(dep) for dep in template.graph.formulas[name].dependencies))
+        for response in template.responses:
+            for experiment in experiments:
+                if experiment["status"] not in ("completed","partial"):continue
+                for name in raw_dependencies(response["name"]):
+                    source=(experiment["observations"].get(name,{}).get("uncertainty") or {}).get("source")
+                    if source:source_usage.setdefault(source,set()).add((experiment["id"],response["name"]))
+        if any(len(uses)>1 for uses in source_usage.values()):
+            raise CapabilityError("共享误差来源跨实验或跨响应：当前独立似然未适配，不能静默忽略相关性")
+        torch.set_num_threads(1)
+        torch.manual_seed(seed)
+        encoder = Encoder(template)
+        models, names, notices, datasets = [], [], [], {}
+        for response in template.responses:
+            name = response["name"]
+            boolean = response.get("value_type") == "bool"
+            records, record_ids = [], []
+            fitting = None
+            for e in experiments:
+                if e["status"] not in ("completed", "partial"): continue
+                cell = e["derived"].get(name) if name in e["derived"] else e["observations"].get(name)
+                if cell is None or cell.get("value") is None or cell.get("status", "valid") != "valid": continue
+                u = cell.get("uncertainty") or {}
+                standard = u.get("standard")
+                if "kind" in u:
+                    from experiment_planner.metrics.uncertainty import Uncertainty
+                    standard = Uncertainty(**u).standard()
+                records.append((e["actual"], float(cell["value"]), standard))
+>               record_ids.append(e["id"])
+                                  ^^^^^^^
+E               KeyError: 'id'
+
+src/experiment_planner/engine/models.py:151: KeyError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117: DeprecationWarning: ax.service.utils.orchestrator_options has been moved to ax.orchestration.orchestrator_options. Please update imports to use: from ax.orchestration.orchestrator_options import OrchestratorOptions, TrialType. This backward compatibility shim will be removed in a future release.
+    from ax.service.utils.orchestrator_options import OrchestratorOptions, TrialType
+
+.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39: DeprecationWarning: ax.service.orchestrator has been moved to ax.orchestration.orchestrator. Please update imports to use: from ax.orchestration.orchestrator import Orchestrator. This backward compatibility shim will be removed in a future release.
+    from ax.service.orchestrator import OrchestratorOptions
+
+tests/integration/test_models.py: 7 warnings
+tests/integration/test_time_dependence.py: 1 warning
+tests/integration/test_v02_strategy.py: 4 warnings
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/linear_operator/utils/cholesky.py:41: NumericalWarning: A not p.d., added jitter of 1.0e-08 to the diagonal
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/integration/test_excel_guidance.py::test_old_experiment_metadata_does_not_select_models_or_inputs
+1 failed, 224 passed, 14 warnings in 92.88s (0:01:32)

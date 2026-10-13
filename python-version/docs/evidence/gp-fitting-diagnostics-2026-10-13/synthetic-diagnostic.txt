@@ -1,0 +1,261 @@
+合成诊断示例，非用户真实故障。
+
+GP 训练诊断
+
+直接失败原因：
+ModelFittingError: 优化器停止状态 FAILURE: ABNORMAL: synthetic line search example (not user data)
+
+最后一次原始停止消息：
+ABNORMAL: synthetic line search example (not user data)
+
+排查提示（不是已确认根因）：
+- 日志涉及优化器线搜索终止；检查数据尺度、极端先验及噪声设置。
+- 存在模型输入相同的记录，详见重复组；真实复测可保留，误差应反映实际散布。
+
+训练上下文（原单位；编码范围另列）：
+{
+  "response": "y",
+  "label": "厚度",
+  "unit": "nm",
+  "model": "gp_rbf_v1",
+  "seed": 0,
+  "sample_count": 5,
+  "experiment_ids": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "encoded_dimensions": 1,
+  "unique_model_conditions": 4,
+  "inputs": [
+    {
+      "name": "x",
+      "label": "功率",
+      "unique_count": 4,
+      "encoded": {
+        "count": 5,
+        "nonfinite_count": 0,
+        "min": 0.0,
+        "max": 1.0
+      },
+      "observed_min": 10.0,
+      "observed_max": 20.0,
+      "allowed_bounds": [
+        10.0,
+        20.0
+      ],
+      "outside_experiment_ids": [],
+      "boundary_count": 3
+    }
+  ],
+  "response_values": {
+    "count": 5,
+    "nonfinite_count": 0,
+    "min": 1.0,
+    "max": 3.2
+  },
+  "residual_after_fixed_trend": {
+    "count": 5,
+    "nonfinite_count": 0,
+    "min": 1.0,
+    "max": 3.2
+  },
+  "noise_mode": "fixed_observation_variance",
+  "observation_variance_original_units": {
+    "count": 5,
+    "nonfinite_count": 0,
+    "min": 0.0025000000000000005,
+    "max": 0.0025000000000000005
+  },
+  "duplicate_condition_groups": [
+    {
+      "experiment_ids": [
+        1,
+        2
+      ],
+      "response": {
+        "count": 2,
+        "nonfinite_count": 0,
+        "min": 1.0,
+        "max": 1.4
+      }
+    }
+  ],
+  "duplicate_group_count": 1,
+  "dependency_versions": {
+    "botorch": "0.18.1",
+    "gpytorch": "1.15.2",
+    "torch": "2.8.0+cpu",
+    "scipy": "1.18.1"
+  },
+  "enabled_priors": []
+}
+
+第 1 次拟合：
+
+{
+  "attempt": 1,
+  "optimizer": "L-BFGS-B",
+  "maxiter": 100,
+  "maxls": 20,
+  "initialization": "library_default",
+  "lengthscale_spread_multiplier": null,
+  "initial_lengthscale": [
+    0.6931471805599453
+  ],
+  "optimizer_result": {
+    "status": "FAILURE",
+    "message": "ABNORMAL: synthetic line search example (not user data)",
+    "iterations": 3,
+    "objective": 1.2
+  },
+  "outcome": "failed",
+  "exception_type": "ModelFittingError",
+  "exception": "优化器停止状态 FAILURE: ABNORMAL: synthetic line search example (not user data)"
+}
+
+原始警告：
+OptimizationWarning: ABNORMAL: synthetic line search example (not user data)
+  <stdin>:24
+
+BoTorch 日志：
+未取得额外日志
+
+本次拟合异常堆栈：
+Traceback (most recent call last):
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 231, in fit_gp
+    fit_gpytorch_mll(ExactMarginalLogLikelihood(inner.likelihood, inner),
+  File "/home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/fit.py", line 141, in fit_gpytorch_mll
+    return _fit_fallback(
+           ^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/fit.py", line 241, in _fit_fallback
+    result = optimizer(mll, closure=closure, **optimizer_kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 228, in optimizer
+    raise ModelFittingError(f"优化器停止状态 {result.status.name}: {result.message}")
+botorch.exceptions.errors.ModelFittingError: 优化器停止状态 FAILURE: ABNORMAL: synthetic line search example (not user data)
+
+
+第 2 次拟合：
+
+{
+  "attempt": 2,
+  "optimizer": "L-BFGS-B",
+  "maxiter": 300,
+  "maxls": 50,
+  "initialization": "data_scaled",
+  "lengthscale_spread_multiplier": 0.5,
+  "initial_lengthscale": [
+    0.2
+  ],
+  "optimizer_result": {
+    "status": "FAILURE",
+    "message": "ABNORMAL: synthetic line search example (not user data)",
+    "iterations": 3,
+    "objective": 1.2
+  },
+  "outcome": "failed",
+  "exception_type": "ModelFittingError",
+  "exception": "优化器停止状态 FAILURE: ABNORMAL: synthetic line search example (not user data)"
+}
+
+原始警告：
+OptimizationWarning: ABNORMAL: synthetic line search example (not user data)
+  <stdin>:24
+
+BoTorch 日志：
+未取得额外日志
+
+本次拟合异常堆栈：
+Traceback (most recent call last):
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 231, in fit_gp
+    fit_gpytorch_mll(ExactMarginalLogLikelihood(inner.likelihood, inner),
+  File "/home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/fit.py", line 141, in fit_gpytorch_mll
+    return _fit_fallback(
+           ^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/fit.py", line 241, in _fit_fallback
+    result = optimizer(mll, closure=closure, **optimizer_kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 228, in optimizer
+    raise ModelFittingError(f"优化器停止状态 {result.status.name}: {result.message}")
+botorch.exceptions.errors.ModelFittingError: 优化器停止状态 FAILURE: ABNORMAL: synthetic line search example (not user data)
+
+
+第 3 次拟合：
+
+{
+  "attempt": 3,
+  "optimizer": "L-BFGS-B",
+  "maxiter": 300,
+  "maxls": 100,
+  "initialization": "data_scaled",
+  "lengthscale_spread_multiplier": 2.0,
+  "initial_lengthscale": [
+    0.8000000000000002
+  ],
+  "optimizer_result": {
+    "status": "FAILURE",
+    "message": "ABNORMAL: synthetic line search example (not user data)",
+    "iterations": 3,
+    "objective": 1.2
+  },
+  "outcome": "failed",
+  "exception_type": "ModelFittingError",
+  "exception": "优化器停止状态 FAILURE: ABNORMAL: synthetic line search example (not user data)"
+}
+
+原始警告：
+OptimizationWarning: ABNORMAL: synthetic line search example (not user data)
+  <stdin>:24
+
+BoTorch 日志：
+未取得额外日志
+
+本次拟合异常堆栈：
+Traceback (most recent call last):
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 231, in fit_gp
+    fit_gpytorch_mll(ExactMarginalLogLikelihood(inner.likelihood, inner),
+  File "/home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/fit.py", line 141, in fit_gpytorch_mll
+    return _fit_fallback(
+           ^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/fit.py", line 241, in _fit_fallback
+    result = optimizer(mll, closure=closure, **optimizer_kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 228, in optimizer
+    raise ModelFittingError(f"优化器停止状态 {result.status.name}: {result.message}")
+botorch.exceptions.errors.ModelFittingError: 优化器停止状态 FAILURE: ABNORMAL: synthetic line search example (not user data)
+
+
+原始异常堆栈及原因链：
+Traceback (most recent call last):
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 231, in fit_gp
+    fit_gpytorch_mll(ExactMarginalLogLikelihood(inner.likelihood, inner),
+  File "/home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/fit.py", line 141, in fit_gpytorch_mll
+    return _fit_fallback(
+           ^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/fit.py", line 241, in _fit_fallback
+    result = optimizer(mll, closure=closure, **optimizer_kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 228, in optimizer
+    raise ModelFittingError(f"优化器停止状态 {result.status.name}: {result.message}")
+botorch.exceptions.errors.ModelFittingError: 优化器停止状态 FAILURE: ABNORMAL: synthetic line search example (not user data)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/worker/process.py", line 16, in _run
+    result = analyze(snapshot, request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/application/analysis.py", line 23, in analyze
+    model, encoder, names, datasets, notices = fit_models(
+                                               ^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/models.py", line 214, in fit_models
+    inner, fitting = fit_gp(factory, reduced, residual, variance, context)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 259, in fit_gp
+    _failure(context, attempts, error)
+  File "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/engine/gp_fitting.py", line 159, in _failure
+    raise ModelTrainingError(message, details) from cause
+experiment_planner.domain.errors.ModelTrainingError: 厚度（y）：GP 在3 次拟合尝试后失败。请点击“查看原始诊断”查看具体原因和实验编号。

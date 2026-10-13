@@ -3,15 +3,14 @@ import torch
 from torch import nn
 from botorch.models.model import Model, ModelList
 from botorch.models import SingleTaskGP
-from botorch.fit import fit_gpytorch_mll
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from botorch.posteriors.transformed import TransformedPosterior
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.kernels import RBFKernel, MaternKernel, ScaleKernel
-from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from experiment_planner.domain.errors import CapabilityError, ValidationError
 from experiment_planner.knowledge.priors import check_capabilities
+from experiment_planner.engine.gp_fitting import fit_gp, training_context
 
 DTYPE = torch.double
 
@@ -137,8 +136,9 @@ def fit_models(template, experiments, preset, seed=0):
     for response in template.responses:
         name = response["name"]
         boolean = response.get("value_type") == "bool"
-        records = []
-        for e in experiments:
+        records, record_ids = [], []
+        fitting = None
+        for row_number, e in enumerate(experiments, 1):
             if e["status"] not in ("completed", "partial"): continue
             cell = e["derived"].get(name) if name in e["derived"] else e["observations"].get(name)
             if cell is None or cell.get("value") is None or cell.get("status", "valid") != "valid": continue
@@ -148,6 +148,7 @@ def fit_models(template, experiments, preset, seed=0):
                 from experiment_planner.metrics.uncertainty import Uncertainty
                 standard = Uncertainty(**u).standard()
             records.append((e["actual"], float(cell["value"]), standard))
+            record_ids.append(e.get("id", f"输入第 {row_number} 行（无实验编号）"))
         if len(records) < 2:
             raise CapabilityError(f"{name}：有效数据不足两条，预测尚不可用")
         X = encoder.encode([r[0] for r in records])
@@ -155,7 +156,7 @@ def fit_models(template, experiments, preset, seed=0):
         known = [r[2] is not None for r in records]
         if any(known) and not all(known):
             raise CapabilityError(f"{name}：混合已知/未知观测噪声尚未适配，不能把未知误差当作零")
-        variance = torch.tensor([r[2]**2 for r in records], dtype=DTYPE).unsqueeze(-1) if all(known) else None
+        variance = torch.tensor([r[2] for r in records], dtype=DTYPE).unsqueeze(-1).square() if all(known) else None
         priors = [p for p in template.data.get("knowledge_priors", []) if p.get("enabled", True) and p["response"] == name]
         excluded = {i for p in priors if p["relation"] == "independent" for i in encoder.indices.get(p["input"], [])}
         active = [i for i in range(encoder.width) if i not in excluded]
@@ -201,11 +202,23 @@ def fit_models(template, experiments, preset, seed=0):
             inner = BayesianLinear(reduced, y, variance, prior_mean, prior_precision)
         else:
             kernel_cls = RBFKernel if preset == "gp_rbf_v1" else MaternKernel
-            kernel = kernel_cls(ard_num_dims=reduced.shape[-1], **({"nu": 2.5} if kernel_cls is MaternKernel else {}))
             residual = y - (trend[0] + X @ trend[1:]).unsqueeze(-1)
-            inner = SingleTaskGP(reduced, residual, train_Yvar=variance, covar_module=ScaleKernel(kernel))
-            fit_gpytorch_mll(ExactMarginalLogLikelihood(inner.likelihood, inner), optimizer_kwargs={"options": {"maxiter": 100}})
+            context = training_context(response, preset, seed, encoder, active, records,
+                                       record_ids, X, y, residual, variance)
+            context["enabled_priors"] = [{k: p[k] for k in ("input", "relation", "coefficient", "strength") if k in p} for p in priors]
+
+            def factory():
+                kernel = kernel_cls(ard_num_dims=reduced.shape[-1], **({"nu": 2.5} if kernel_cls is MaternKernel else {}))
+                return SingleTaskGP(reduced, residual, train_Yvar=variance, covar_module=ScaleKernel(kernel))
+
+            inner, fitting = fit_gp(factory, reduced, residual, variance, context)
             notices.append(f"{name}: {'已提供观测方差 u²' if variance is not None else 'GP 估计未知噪声'}")
+            if fitting["recovered"]:
+                notices.append(f"{response.get('label', name)}：调整核参数初值和线搜索后，第 {len(fitting['attempts'])} 次 GP 拟合恢复；原始记录和测量误差未改变，过程见技术详情。")
+            if fitting["attempts"][-1].get("optimizer_result", {}).get("status") == "STOPPED":
+                notices.append(f"{response.get('label', name)}：优化达到停止条件，训练点后验有限；请查看技术详情中的停止原因，这不保证已充分收敛。")
+            if any(p.get("outside_experiment_ids") for p in context["inputs"]):
+                notices.append(f"{name}：部分历史输入超出当前模板范围，训练保留原值；请核对技术详情中的字段及实验编号。")
         models.append(ProjectedModel(inner, active, trend))
         names.append(name)
         feature_ranges = {}
@@ -219,5 +232,7 @@ def fit_models(template, experiments, preset, seed=0):
             if unique == 1:
                 notices.append(f"{response.get('label', name)}：有效训练记录中的 {field.get('label', field['name'])} 只有一个取值；无法从这些数据识别其影响，平坦预测不代表物理无关")
         datasets[name] = {"count": len(records), "features": [p["name"] for p in encoder.fields if any(i in active for i in encoder.indices[p["name"]])], "feature_ranges": feature_ranges, "conditions": [r[0] for r in records]}
+        if fitting is not None:
+            datasets[name]["gp_training"] = fitting
 
     return ModelList(*models), encoder, names, datasets, ["各基础响应条件独立；同一响应保留候选点间相关性", "区间表示潜在响应，不包含未提供的未来测量误差", *notices]

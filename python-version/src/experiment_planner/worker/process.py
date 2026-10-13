@@ -7,6 +7,7 @@ from experiment_planner.domain.errors import ValidationError
 
 
 def _run(connection, snapshot, request, operation):
+    captured = []
     try:
         with warnings.catch_warnings(record=True) as captured:
             warnings.simplefilter("always")
@@ -22,7 +23,13 @@ def _run(connection, snapshot, request, operation):
         connection.send({"result": result})
     except Exception as exc:
         from experiment_planner.ui.messages import user_error, exception_diagnostic
-        connection.send({"error": user_error(exc), "diagnostic": exception_diagnostic(exc)})
+        diagnostic = exception_diagnostic(exc)
+        if captured:
+            diagnostic += "\n计算失败前的原始警告：\n" + "\n".join(
+                f"{w.category.__name__}: {w.message}\n  {w.filename}:{w.lineno}"
+                for w in captured
+            )
+        connection.send({"error": user_error(exc), "diagnostic": diagnostic})
     finally: connection.close()
 
 

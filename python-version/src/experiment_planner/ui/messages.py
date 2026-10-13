@@ -3,16 +3,23 @@ import json
 import traceback
 
 from experiment_planner.precision.rounding import display
-from experiment_planner.domain.errors import ValidationError, StaleVersionError
+from experiment_planner.domain.errors import ValidationError, StaleVersionError, ModelTrainingError
 
 
 def exception_diagnostic(error):
     """Preserve the exception type, message, traceback and chained causes."""
+    if isinstance(error, ModelTrainingError):
+        # Put actionable training context before long library stack traces. The
+        # TracebackException is a copy; keep the exception's notes intact for CLI.
+        trace = traceback.TracebackException.from_exception(error)
+        details = "\n".join(trace.__notes__ or [])
+        trace.__notes__ = []
+        return details + "\n\n原始异常堆栈及原因链：\n" + "".join(trace.format())
     return "".join(traceback.format_exception(error))
 
 
 def user_error(error):
-    if isinstance(error, (ValidationError, StaleVersionError)):
+    if isinstance(error, (ValidationError, StaleVersionError, ModelTrainingError)):
         return str(error)
     if isinstance(error, json.JSONDecodeError):
         return f"配置格式有误：第 {error.lineno} 行、第 {error.colno} 列。请检查逗号、引号及括号。"

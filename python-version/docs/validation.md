@@ -1,5 +1,30 @@
 # Python 源码版验证报告
 
+## GP 拟合诊断与恢复 · 2026-10-13
+
+在 `python-version/.venv` 的 Linux / CPython 3.12.3 / PySide6 6.12.0 / Qt offscreen 环境验证，BoTorch 0.18.1、GPyTorch 1.15.2、PyTorch 2.8.0+cpu、SciPy 1.18.1。[环境记录](evidence/gp-fitting-diagnostics-2026-10-13/environment.json)。
+
+| 验证 | 实际结果 |
+| --- | --- |
+| 全部单元测试、全部集成测试、失败诊断与绘图范围 GUI 测试 | **227 passed，0 failed，0 skipped**，87.85 秒；进程退出码 0。[日志](evidence/gp-fitting-diagnostics-2026-10-13/tests.txt)、[JUnit](evidence/gp-fitting-diagnostics-2026-10-13/tests.xml)。涵盖预测、推荐、误差传播、保存、导入导出、后台进程及相关界面。 |
+| 最终诊断排版复测 | 将具体失败信息放在长堆栈前后，重新执行 GP 诊断、后台失败和诊断 GUI 测试，**33 passed，0 failed，0 skipped**，34.38 秒；进程退出码 0。这 33 项包含于上面的回归范围，不累加为不同测试数。[日志](evidence/gp-fitting-diagnostics-2026-10-13/final-diagnostics.txt)、[JUnit](evidence/gp-fitting-diagnostics-2026-10-13/final-diagnostics.xml)。 |
+| 真实 GP 与模板端点 | RBF/Matérn × 已知/未知噪声 × 普通紧范围/宽度约 `1e-9` 的范围，共 **8 种真实拟合**均返回有限后验；实验点恰好位于两个端点，编码分别为 0 和 1，诊断标记两个边界点且没有越界点。 |
+| 恢复路径 | 在合成数据上控制前两次优化失败、第三次执行真实 SciPy 拟合；覆盖变化输入和恒定输入两种情况，确认核参数初值不同、已知观测方差逐项保持不变、原记录未修改、恢复过程可序列化并有提示。不是用户原失败的复现。 |
+| 失败与界面证据 | 保留优化器异常前警告、BoTorch 内部捕获的矩阵异常和 DEBUG 日志、原始异常链与数据上下文；非有限输入/响应/方差定位到实验编号，非有限优化目标不作为成功结果，接口错误不反复重试。展开、复制及顶部重看均通过实际 Qt 控件测试。[合成诊断文本](evidence/gp-fitting-diagnostics-2026-10-13/synthetic-diagnostic.txt)、[已查看的展开弹窗截图](evidence/gp-fitting-diagnostics-2026-10-13/expanded-training-diagnostic.png)。 |
+
+首轮扩大回归发现直接 Python 接口可能传入没有数据库编号的记录，新增诊断读取编号时引入了兼容性失败；已改为明确的输入行号标签并增加回归。首次结果为 224 passed / 1 failed，不计作最终通过结果：[初次日志](evidence/gp-fitting-diagnostics-2026-10-13/initial-tests.txt)、[初次 JUnit](evidence/gp-fitting-diagnostics-2026-10-13/initial-tests.xml)。随后完成上表通过的整组重跑。最终排版复测仅调整错误信息展示次序，没有再修改拟合策略。
+
+测试中 14 条警告为依赖弃用及库自动加入 `1e-8` jitter 的数值提示；最终分组为 2 条依赖弃用警告。截图生成还出现离屏平台/字体缓存提示，截图已生成并实际检查。没有 Windows 实机、Python 3.13 或用户原始实验数据验证；本轮没有运行其余 GUI 文件。恢复策略不保证所有数据都能拟合成功，仍失败时保留具体诊断，不生成伪造的预测结果。
+
+复现（在 `python-version`）：
+
+```bash
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -p no:cacheprovider tests/unit tests/integration tests/gui/test_failure_diagnostics.py tests/gui/test_plot_ranges.py
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -p no:cacheprovider tests/integration/test_gp_diagnostics.py tests/integration/test_worker_failures.py tests/gui/test_failure_diagnostics.py
+```
+
+实现：[GP 拟合与诊断](../src/experiment_planner/engine/gp_fitting.py)、[模型接入](../src/experiment_planner/engine/models.py)、[后台警告保留](../src/experiment_planner/worker/process.py)。新增数值验证：[GP 诊断测试](../tests/integration/test_gp_diagnostics.py)。
+
 ## 计算失败原始诊断 · 2026-10-13
 
 改动范围仅 `python-version`。使用本目录独立虚拟环境，在 Linux / CPython 3.12.3 / PySide6 6.12.0 / Qt offscreen 下分组验证：**74 项相关测试通过，0 失败，0 错误，0 跳过，两组进程退出码均为 0**。依赖检查 `pip check` 通过，加载的源码来自本目录。[环境](evidence/failure-diagnostics-2026-10-13/environment.json)、[结果汇总](evidence/failure-diagnostics-2026-10-13/summary.json)。

@@ -1,0 +1,13 @@
+{
+  "python": "3.12.3",
+  "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+  "executable": "/home/ubuntu/projects/experiment-planner/python-version/.venv/bin/python",
+  "versions": {
+    "botorch": "0.18.1",
+    "gpytorch": "1.15.2",
+    "torch": "2.8.0+cpu",
+    "scipy": "1.18.1",
+    "PySide6": "6.12.0"
+  },
+  "note": "Linux offscreen synthetic diagnostic preview; no user experiment data."
+}

@@ -199,3 +199,29 @@ def test_configuration_failure_before_calculation_has_details(window, conditions
     window.guard(window.start_analysis)
     assert_diagnostic(observed, "上下限需要数值")
     assert window.analysis_task is None and window.analyze_button.isEnabled()
+
+
+def test_training_failure_context_and_warning_can_be_copied_and_reopened(window, monkeypatch):
+    import warnings
+    from experiment_planner.domain.errors import ModelTrainingError
+    from experiment_planner.worker.process import _run
+
+    class Connection:
+        def send(self, payload): self.payload = payload
+        def close(self): pass
+
+    def fail(*args):
+        warnings.warn("OptimizationWarning: ABNORMAL line search", RuntimeWarning)
+        raise ModelTrainingError("厚度（y）：GP 训练失败", "实验编号 [1, 2]；允许范围 [10, 20]；第 3 次失败")
+
+    monkeypatch.setattr("experiment_planner.application.analysis.analyze", fail)
+    connection = Connection()
+    _run(connection, {}, {}, "analyze")
+    window.analysis_task = CompletedTask(connection.payload)
+    observed = inspect_next_failure()
+    window.poll_analysis()
+    assert_diagnostic(observed, "ABNORMAL line search")
+    assert "实验编号 [1, 2]" in observed["copied"]
+    observed = inspect_next_failure()
+    window.diagnostic_button.click()
+    assert_diagnostic(observed, "允许范围 [10, 20]")

@@ -1,0 +1,23 @@
+{
+  "synthetic_only": true,
+  "windows_verified": false,
+  "runs": [
+    {
+      "tests": 227,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "file": "tests.xml",
+      "seconds": 87.833
+    },
+    {
+      "tests": 33,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "file": "final-diagnostics.xml",
+      "seconds": 34.374
+    }
+  ],
+  "note": "The final 33 diagnostics tests are a subset of the 227-test regression group, not 33 additional distinct tests."
+}

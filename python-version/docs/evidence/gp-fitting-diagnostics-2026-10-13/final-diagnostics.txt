@@ -1,0 +1,12 @@
+.................................                                        [100%]
+=============================== warnings summary ===============================
+tests/integration/test_worker_failures.py::test_worker_retains_pre_failure_warnings_and_training_context[generate]
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117: DeprecationWarning: ax.service.utils.orchestrator_options has been moved to ax.orchestration.orchestrator_options. Please update imports to use: from ax.orchestration.orchestrator_options import OrchestratorOptions, TrialType. This backward compatibility shim will be removed in a future release.
+    from ax.service.utils.orchestrator_options import OrchestratorOptions, TrialType
+
+tests/integration/test_worker_failures.py::test_worker_retains_pre_failure_warnings_and_training_context[generate]
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39: DeprecationWarning: ax.service.orchestrator has been moved to ax.orchestration.orchestrator. Please update imports to use: from ax.orchestration.orchestrator import Orchestrator. This backward compatibility shim will be removed in a future release.
+    from ax.service.orchestrator import OrchestratorOptions
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+33 passed, 2 warnings in 34.38s

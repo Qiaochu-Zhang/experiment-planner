@@ -56,3 +56,31 @@ def test_abrupt_worker_exit_has_readable_exit_diagnostic_and_releases_lock(servi
     finally:
         if str(service.project.path) in CalculationTask.active:
             task.cancel()
+
+
+@pytest.mark.parametrize("operation", ["generate", "analyze"])
+def test_worker_retains_pre_failure_warnings_and_training_context(monkeypatch, operation):
+    import warnings
+    from experiment_planner.domain.errors import ModelTrainingError
+    from experiment_planner.worker.process import _run
+
+    class Connection:
+        def send(self, payload): self.payload = payload
+        def close(self): self.closed = True
+
+    def fail(*args, **kwargs):
+        warnings.warn("原始优化停止原因：ABNORMAL", RuntimeWarning)
+        try:
+            raise ArithmeticError("原始数值异常")
+        except ArithmeticError as exc:
+            raise ModelTrainingError("厚度（y）：GP 训练失败", "失败响应 y；实验编号 [1, 2]") from exc
+
+    target = ("experiment_planner.application.analysis.analyze" if operation == "analyze"
+              else "experiment_planner.engine.planner.generate")
+    monkeypatch.setattr(target, fail)
+    connection = Connection()
+    _run(connection, {}, {}, operation)
+    assert connection.closed
+    assert connection.payload["error"] == "厚度（y）：GP 训练失败"
+    for expected in ("ABNORMAL", "原始数值异常", "实验编号 [1, 2]", "RuntimeWarning", "计算失败前的原始警告"):
+        assert expected in connection.payload["diagnostic"]
