@@ -5,7 +5,7 @@ import math
 import pytest
 import torch
 
-from experiment_planner.application.measurement_uncertainty import plan_standard_uncertainty
+from experiment_planner.application.measurement_uncertainty import plan_standard_uncertainty, raw_measurement_names
 from experiment_planner.application.service import PlannerService
 from experiment_planner.domain.errors import CapabilityError, StaleVersionError, ValidationError
 from experiment_planner.domain.template import Template
@@ -166,7 +166,8 @@ def test_fill_unknown_allows_real_gp_and_smaller_error_increases_trust(tmp_path,
             fit_models(template, p.experiments(), preset)
         assert "误差已知的实验：1；误差未知的实验：2" in str(caught.value)
         assert "统一设置误差" in str(caught.value)
-        service.set_measurement_uncertainty([a, b], ["y"], 1., only_unknown=True)
+        service.set_measurement_uncertainty([a, b], ["y"], 1., only_unknown=True,
+                                            trusted_experiment_ids=[a], trusted_factor=.2)
         model, encoder, _, _, _ = fit_models(template, p.experiments(), preset)
         first_prediction = model.posterior(encoder.encode([{"x": .5}])).mean.item()
         assert math.isfinite(first_prediction) and abs(first_prediction - 10.) < .5
@@ -178,3 +179,73 @@ def test_fill_unknown_allows_real_gp_and_smaller_error_increases_trust(tmp_path,
         assert second_prediction > first_prediction
         assert torch.isfinite(model.posterior(encoder.encode([{"x": .5}])).variance).all()
         assert [r["observations"]["y"]["value"] for r in p.experiments()] == [10., 14.]
+
+
+def test_relative_setting_one_action_preserves_smaller_and_other_known_errors(service, conditions, measurements):
+    p = service.project
+    ids = [service.add_record(conditions, measurements, note="原实验备注") for _ in range(4)]
+    service.set_measurement_uncertainty([ids[0]], SIO2, 1.)
+    service.set_measurement_uncertainty([ids[1]], SIO2, .1)
+    service.set_measurement_uncertainty([ids[2]], SIO2, .3)
+    before, revision = p.experiments(), p.revision
+    result = service.set_measurement_uncertainty(ids, SIO2, 1., only_unknown=True,
+        trusted_experiment_ids=ids[:2], trusted_factor=.5, reason="按复测稳定性作的假设", expected_revision=revision)
+    after = p.experiments()
+    assert result == {"changed_records": 2, "changed_cells": 4, "replaced_known": 2, "skipped_known": 4, "skipped_missing": 0}
+    assert p.revision == revision + 1
+    assert [r["observations"][SIO2[0]]["uncertainty"]["amount"] for r in after] == [.5, .1, .3, 1.]
+    assert after[1] == before[1] and after[2] == before[2]
+    for i in (0, 3):
+        assert after[i]["note"] == "原实验备注"
+        cell = after[i]["observations"][SIO2[0]]
+        assert "误差设定假设" in cell["note"] and "复测稳定性" in cell["note"]
+        assert cell["uncertainty"]["source"] is None
+        assert after[i]["derived"]["sio2_loss_nm"]["uncertainty"]["standard"] == pytest.approx(math.sqrt(2) * cell["uncertainty"]["amount"])
+    assert "基准 1 × 0.5" in after[0]["observations"][SIO2[0]]["note"]
+    service.undo(); assert p.experiments() == before
+    service.redo(); assert p.experiments() == after
+    revision = p.revision
+    assert service.set_measurement_uncertainty(ids, SIO2, 1., only_unknown=True,
+        trusted_experiment_ids=ids[:2], trusted_factor=.5, reason="重复点击不追加备注")["changed_cells"] == 0
+    assert p.experiments() == after and p.revision == revision
+
+
+@pytest.mark.parametrize("factor,ids", [(0, [1]), (1, [1]), (-.1, [1]), (float("nan"), [1]),
+    (float("inf"), [1]), (True, [1]), (.5, []), (.5, [999]), (.5, [True]), (None, [1])])
+def test_invalid_relative_plan_is_atomic(service, conditions, measurements, factor, ids):
+    eid = service.add_record(conditions, measurements)
+    before = service.project.snapshot(), service.project.history()
+    with pytest.raises(ValidationError):
+        service.set_measurement_uncertainty([eid], SIO2, 1., trusted_experiment_ids=ids, trusted_factor=factor)
+    assert (service.project.snapshot(), service.project.history()) == before
+
+
+def test_relative_plan_preview_notes_save_and_scope(service, conditions, measurements):
+    ids = [service.add_record(conditions, {name: {"value": value, "note": "原测量备注"} for name, value in measurements.items()}) for _ in range(2)]
+    p = service.project
+    before = p.snapshot()
+    plan = plan_standard_uncertainty(p.template, p.experiments(), SIO2, 2., only_unknown=True,
+                                    trusted_experiment_ids=[ids[0]], trusted_factor=.25, reason="假设")
+    assert p.snapshot() == before
+    assert [(d["experiment_id"], d["before"], d["after"], d["role"]) for d in plan.details] == [(1, None, .5, "高可信"), (1, None, .5, "高可信"), (2, None, 2., "基准"), (2, None, 2., "基准")]
+    with ProjectSession(p.path) as session:
+        s = PlannerService(session)
+        s.set_measurement_uncertainty(ids, SIO2, 2., only_unknown=True,
+                                      trusted_experiment_ids=[ids[0]], trusted_factor=.25, reason="假设")
+        assert session.dirty
+        session.save()
+    with Project(p.path) as reopened:
+        for i, value in zip(ids, [.5, 2.]):
+            cell = reopened.experiment(i)["observations"][SIO2[0]]
+            assert cell["uncertainty"]["amount"] == value
+            assert cell["note"].startswith("原测量备注\n误差设定假设")
+            assert reopened.experiment(i)["observations"]["sin_initial_nm"] == before["experiments"][i-1]["observations"]["sin_initial_nm"]
+
+
+def test_select_measurements_for_nested_response_and_custom_names(template):
+    assert raw_measurement_names(template, "sio2_loss_nm") == set(SIO2)
+    assert raw_measurement_names(template, "selectivity") == {f["name"] for f in template.measurements}
+    assert raw_measurement_names(template, "cl2_sccm") == set()
+    data = template.data
+    data["derived_metrics"].append({"name": "twice_loss", "expression": "sio2_loss_nm * 2", "unit": "nm"})
+    assert raw_measurement_names(Template(data), "twice_loss") == set(SIO2)

@@ -2,7 +2,8 @@
 import pytest
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialogButtonBox
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QApplication, QDialogButtonBox, QScrollArea
 
 from experiment_planner.domain.template import Template
 from experiment_planner.storage.project import Project
@@ -87,3 +88,97 @@ def test_real_button_dialog_apply_cancel_and_undo(qt_application, tmp_path, cond
     else:
         assert p.experiments() == before
     window.close()
+
+
+def test_relative_mode_selects_all_targets_and_previews_values_and_reason(qt_application, service, conditions, measurements):
+    ids = [service.add_record(conditions, measurements) for _ in range(3)]
+    service.set_measurement_uncertainty([ids[1]], ["sio2_initial_nm", "sio2_remaining_nm"], .1)
+    before = service.project.snapshot()
+    dialog = MeasurementUncertaintyDialog(service.project.template, service.project.experiments(), ids[:2])
+    dialog.mode.setCurrentIndex(dialog.mode.findData("relative"))
+    dialog.choose_related_fields(next(i for i in range(dialog.quick_fields.count()) if dialog.quick_fields.itemData(i) == ["sio2_initial_nm", "sio2_remaining_nm"]))
+    dialog.amount.setText("1")
+    dialog.factor.setValue(.5)
+    dialog.reason.setText("试用更可信的复测记录")
+    assert dialog.only_unknown.isChecked() and not dialog.scope.isEnabled()
+    assert dialog.target_records() == service.project.experiments()
+    assert "= 0.5" in dialog.trusted_hint.text()
+    assert "修改 2 条实验、4 项" in dialog.preview.text()
+    assert dialog.details.rowCount() == 4
+    assert dialog.details.item(0, 4).text() == "0.5"
+    assert dialog.details.item(2, 4).text() == "1"
+    assert "试用更可信" in dialog.details.item(0, 0).toolTip()
+    assert service.project.snapshot() == before
+    for i in range(dialog.trusted_records.count()):
+        dialog.trusted_records.item(i).setCheckState(Qt.CheckState.Unchecked)
+    assert not dialog.apply_button.isEnabled() and "高可信实验" in dialog.preview.text()
+    dialog.mode.setCurrentIndex(0)
+    assert dialog.scope.isEnabled() and dialog.values()["trusted_factor"] is None
+    dialog.close()
+
+
+def test_read_common_value_and_related_measurement_shortcuts(qt_application, service, conditions, measurements):
+    eid = service.add_record(conditions, measurements)
+    service.set_measurement_uncertainty([eid], ["sio2_initial_nm", "sio2_remaining_nm"], .3)
+    dialog = MeasurementUncertaintyDialog(service.project.template, service.project.experiments())
+    index = next(i for i in range(dialog.quick_fields.count()) if dialog.quick_fields.itemData(i) == ["sio2_initial_nm", "sio2_remaining_nm"])
+    dialog.choose_related_fields(index)
+    dialog.load_current_amount()
+    assert dialog.amount.text() == "0.3"
+    assert not dialog.apply_button.isEnabled()  # Already identical: no accidental rewrite.
+    dialog.choose_related_fields(next(i for i in range(dialog.quick_fields.count()) if dialog.quick_fields.itemText(i).startswith("SiN")))
+    dialog.load_current_amount()
+    assert "没有唯一" in dialog.read_feedback.text()
+    assert dialog.amount.text() == "0.3"
+    dialog.close()
+
+
+def test_relative_dialog_applies_both_groups_in_one_revision(qt_application, tmp_path, conditions, measurements):
+    window = PythonWindow()
+    window.set_project(Project.create(tmp_path / "relative.sqlite", "相对误差"))
+    for _ in range(2): window.service.add_record(conditions, measurements)
+    window.refresh(); window.go_to(0); window.show(); qt_application.processEvents()
+    window.table.selectRow(0)
+    p = window.require_project()
+    before, revision = p.experiments(), p.revision
+    seen = []
+    def apply():
+        dialog = QApplication.activeModalWidget()
+        seen.append(isinstance(dialog, MeasurementUncertaintyDialog))
+        if not seen[-1]: dialog.reject(); return
+        dialog.mode.setCurrentIndex(dialog.mode.findData("relative"))
+        dialog.amount.setText("1")
+        dialog.factor.setValue(.5)
+        dialog.reason.setText("按复测比较")
+        QTest.mouseClick(dialog.apply_button, Qt.MouseButton.LeftButton)
+    QTimer.singleShot(0, apply)
+    QTest.mouseClick(window.uncertainty_button, Qt.MouseButton.LeftButton)
+    assert seen == [True] and p.revision == revision + 1
+    assert p.experiment(1)["observations"]["sio2_initial_nm"]["uncertainty"]["amount"] == .5
+    assert p.experiment(2)["observations"]["sio2_initial_nm"]["uncertainty"]["amount"] == 1.
+    assert "复测比较" in p.experiment(1)["observations"]["sio2_initial_nm"]["note"]
+    window.history_step(False)
+    assert p.experiments() == before
+    window.close()
+
+
+@pytest.mark.parametrize("width,height,scale", [(680, 560, 1.), (840, 760, 1.5)])
+def test_relative_editor_scrolls_but_summary_and_apply_stay_visible(qt_application, service, conditions, measurements, width, height, scale):
+    eid = service.add_record(conditions, measurements)
+    dialog = MeasurementUncertaintyDialog(service.project.template, service.project.experiments(), [eid])
+    font = QFont(dialog.font())
+    font.setPointSizeF(max(9., font.pointSizeF()) * scale)
+    dialog.setFont(font)
+    dialog.mode.setCurrentIndex(1)
+    dialog.amount.setText("1")
+    dialog.show_details.setChecked(True)
+    dialog.resize(width, height); dialog.show(); qt_application.processEvents()
+    assert dialog.height() == height
+    assert dialog.rect().contains(dialog.apply_button.mapTo(dialog, dialog.apply_button.rect().center()))
+    assert dialog.rect().contains(dialog.preview.mapTo(dialog, dialog.preview.rect().center()))
+    scroll = dialog.findChild(QScrollArea)
+    scroll.ensureWidgetVisible(dialog.factor); qt_application.processEvents()
+    assert scroll.viewport().rect().contains(dialog.factor.mapTo(scroll.viewport(), dialog.factor.rect().center()))
+    scroll.ensureWidgetVisible(dialog.details); qt_application.processEvents()
+    assert scroll.viewport().rect().contains(dialog.details.mapTo(scroll.viewport(), dialog.details.rect().center()))
+    dialog.close()

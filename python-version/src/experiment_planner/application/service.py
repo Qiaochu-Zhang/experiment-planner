@@ -106,7 +106,8 @@ class PlannerService:
 
     @reversible
     def set_measurement_uncertainty(self, experiment_ids, measurement_names, amount, *,
-                                    only_unknown=False, expected_revision=None):
+                                    only_unknown=False, expected_revision=None,
+                                    trusted_experiment_ids=(), trusted_factor=None, reason=""):
         """Apply one reversible, audited bulk edit to existing measured cells."""
         ids = list(experiment_ids)
         if not ids or any(type(eid) is not int or eid <= 0 for eid in ids):
@@ -116,7 +117,9 @@ class PlannerService:
         with p.transaction(self._action_revision if expected_revision is None else expected_revision):
             template = p.template
             plan = plan_standard_uncertainty(template, [p.experiment(eid) for eid in ids],
-                                             measurement_names, amount, only_unknown=only_unknown)
+                                             measurement_names, amount, only_unknown=only_unknown,
+                                             trusted_experiment_ids=trusted_experiment_ids,
+                                             trusted_factor=trusted_factor, reason=reason)
             for _, new in plan.changes:
                 new["derived"] = derive(template, new["actual"], new["observations"])
                 new["template_version"] = template.data["template_version"]

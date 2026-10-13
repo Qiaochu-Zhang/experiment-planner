@@ -1,5 +1,29 @@
 # Python 源码版验证报告
 
+## 基准误差与高可信实验的组合设置 · 2026-10-13
+
+在本目录独立环境 Linux / Python 3.12.3 / Qt offscreen 下完成 **271 项不同测试，0 失败、0 跳过**；两组进程退出码均为 0：
+
+| 验证组 | 实际结果与证据 |
+| --- | --- |
+| 全部单元与集成测试，排除本次未修改的后台失败及后台取消/绘图两个文件 | **237 passed**，78.86 秒，14 条既有依赖弃用与矩阵 jitter 警告。[日志](evidence/relative-uncertainty-2026-10-13/core-tests.txt)、[JUnit](evidence/relative-uncertainty-2026-10-13/core-tests.xml)。 |
+| 误差设置、撤销导出、失败诊断及原型窗口 GUI | **34 passed**，88.69 秒。[日志](evidence/relative-uncertainty-2026-10-13/gui-tests.txt)、[JUnit](evidence/relative-uncertainty-2026-10-13/gui-tests.xml)。 |
+
+两个误差设置测试文件最终共 49 项，包含本次新增 18 项；早期 47 项定向检查已经包含于最终回归，不重复累加。布局压缩后新增了小窗口及 1.5 倍字体两项检查，验证表单可滚动、汇总与应用按钮保持可见。[定向日志](evidence/relative-uncertainty-2026-10-13/focused-tests.txt)。
+
+验证包含：一次事务同时应用基准与高可信误差；仅补齐其他实验的未知误差；高可信记录更小/相等误差保留；输入非法比例、范围外高可信编号时不修改数据；备注追加与保存重开；一步撤销/重做；重复相同设置不生成新备注和版本；按嵌套公式追溯原始测量；读取共同 1σ；逐项预览及真实按钮提交。两个 GP 核的实际训练验证了组合补齐后不再触发混合噪声检查，并保持原始测量值不变。
+
+[已实际查看的最终界面截图](evidence/relative-uncertainty-2026-10-13/dialog.png) 使用 4 条合成记录：快速选择 SiO2 刻蚀量所需的 2 项测量，基准 1 nm、高可信比例 0.5；实验 1 使用 0.5 nm，实验 2 原有 0.1 nm 被保留，实验 3/4 补齐 1 nm。因此预览显示修改 3 条实验 / 6 项测量，保留 2 项已知误差。截图生成的离屏平台及字体缓存提示没有妨碍显示和保存。
+
+复现（工作目录 `python-version`，设置 `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen`）：
+
+```bash
+.venv/bin/python -m pytest -q -p no:cacheprovider tests/unit tests/integration --ignore=tests/integration/test_worker_failures.py --ignore=tests/integration/test_worker_plots.py
+.venv/bin/python -m pytest -q -p no:cacheprovider tests/gui/test_measurement_uncertainty_ui.py tests/gui/test_history_export_ui.py tests/gui/test_failure_diagnostics.py tests/gui/test_window.py
+```
+
+本次没有重跑被排除的 9 项后台测试及其他 GUI 文件；其上一次结果见下节。没有 Windows 实机、Python 3.13 或用户真实实验数据验证。比例和自动备注代表用户明确设定的假设，不是测量误差标定，也不改变现有模型对混合噪声和共享误差的能力限制。
+
 ## 统一设置测量误差 · 2026-10-13
 
 在本目录独立环境 Linux / CPython 3.12.3 / PySide6 6.12.0 / Qt offscreen 下完成 **279 项不同测试，0 失败、0 跳过**。依赖版本及环境见 [环境记录](evidence/uniform-uncertainty-2026-10-13/environment.json)。最终按下面四组运行，各组进程退出码均为 0：
