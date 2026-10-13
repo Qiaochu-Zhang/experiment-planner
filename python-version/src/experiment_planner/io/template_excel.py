@@ -93,6 +93,7 @@ def _column_hint(section, key):
 
 
 SETTING_CHOICES = {
+    "input_uncertainty.samples": [8, 16, 32],
     "optimization.mode": ["pareto", "single", "weighted"],
     "optimization.default_model_preset": ["gp_rbf_v1", "gp_matern25_v1", "bayesian_linear_v1"],
     "ratio_policy.mode": ["remove", "stabilized", "valid_region", "require_configuration"],
@@ -109,6 +110,8 @@ SETTING_NUMBERS = {
 
 def _setting_hint(key):
     notes = {
+        "input_uncertainty.enabled": "可选总开关，默认否。开启后对所选连续输入考虑未来执行波动，历史输入仍按记录值训练。",
+        "input_uncertainty.samples": "每个条件的输入扰动采样数：8、16 或 32。分布按模板范围与线性约束条件化，数值越大计算通常越慢。",
         "name": "模板名称，可自由修改。", "schema_version": "必填：格式版本，固定为整数 2。",
         "template_version": "必填：模板版本，整数 ≥ 1。",
         "optimization.mode": "必填：pareto 多目标折中；single 恰好一个有效目标；weighted 配合 weights/scales 的 JSON 数组。",

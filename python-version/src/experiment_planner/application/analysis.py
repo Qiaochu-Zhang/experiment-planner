@@ -34,6 +34,11 @@ def analyze(snapshot, request):
             model, encoder, names, template, conditions, seed=seed
         ),
     }
+    from experiment_planner.domain.input_uncertainty import uncertainty_info, INPUT_UNCERTAINTY_NOTICE
+    info = uncertainty_info(template)
+    if info:
+        result["input_uncertainty"] = info
+        result["notices"].append(INPUT_UNCERTAINTY_NOTICE)
     if request.get("plot_path"):
         from experiment_planner.plots.trends import plot_slice
         points = request.get("points", 15)

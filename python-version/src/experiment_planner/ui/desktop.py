@@ -91,6 +91,7 @@ class PythonWindow(MainWindow):
         actions = QHBoxLayout()
         layout.addLayout(actions)
         button("编辑项目模板", lambda: self.guard(self.edit_template), actions)
+        button("输入不确定度", lambda: self.guard(lambda: self.edit_template("input_uncertainty")), actions)
         button("新建 / 复制 / 修改模板文件", lambda:self.guard(self.create_template),actions)
         button("模板导出",lambda:self.guard(self.export_template),actions)
         button("从模板新建项目",lambda:self.guard(self.create_from_template),actions)
@@ -445,6 +446,7 @@ class PythonWindow(MainWindow):
         self.favorite_grid=QGridLayout();layout.addLayout(self.favorite_grid);layout.addStretch()
         self.actions={
             "precision":("推荐工艺精度",lambda:self.edit_template("precision"),"设置整数、小数位数与设备步长"),
+            "input_uncertainty":("输入不确定度",lambda:self.edit_template("input_uncertainty"),"可选开启流量、功率、温度、时间等输入的执行波动"),
             "priors":("先验关系定义",lambda:self.edit_template("priors"),"选择输入和响应，填写关系与来源"),
             "objectives":("实验优化目标",lambda:self.edit_template("objectives"),"选择单目标、多目标和分母策略"),
             "recommend":("推荐下一批实验",lambda:self.go_to(1),"设置探索强度、专门探索名额及复测"),

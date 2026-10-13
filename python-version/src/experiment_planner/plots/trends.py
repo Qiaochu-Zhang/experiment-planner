@@ -83,6 +83,9 @@ def plot_slice(model,encoder,names,template,baseline,variables,metric,path,revis
     partial = any(p[metric].get("nonfinite_sample_count", 0) for p in predictions)
     notices = (["部分绘图点存在非有限样本；区间仅描述有限样本，不能视为完整预测分布的区间。"]
                if partial else [])
+    with_input = bool(predictions[0].get("input_uncertainty"))
+    if with_input:
+        notices.append("趋势图已包含所选输入的执行波动；输入确定时的对照结果保存在技术详情和导出表中。")
     figure=Figure(figsize=(9,6),layout="constrained");ax=figure.subplots()
     quantiles=np.array([p[metric]["quantiles"] for p in predictions],dtype=float)
     font=FontProperties(fname=str(files("experiment_planner").joinpath("resources/fonts/NotoSansCJK-Regular.ttc")))
@@ -92,7 +95,7 @@ def plot_slice(model,encoder,names,template,baseline,variables,metric,path,revis
         x=[c[variables[0]] for c in conditions]
         ax.plot(x,quantiles[:,1],label="后验中位数")
         ax.fill_between(x,quantiles[:,0],quantiles[:,2],alpha=.25,
-                        label="有限样本中央 95% 区间" if partial else "潜在响应中央 95% 区间")
+                        label="有限样本中央 95% 区间" if partial else "含输入波动的中央 95% 区间" if with_input else "潜在响应中央 95% 区间")
         if ranges[variables[0]][0] <= baseline[variables[0]] <= ranges[variables[0]][1]:
             ax.axvline(baseline[variables[0]],ls="--",color="gray",label="基准输入")
         ax.set_ylabel(metric_label,fontproperties=font);ax.legend(prop=font)
@@ -108,6 +111,7 @@ def plot_slice(model,encoder,names,template,baseline,variables,metric,path,revis
     fixed={k:v for k,v in baseline.items() if k not in variables}
     fixed_text="，".join(f"{labels.get(k,k)}={v:g}" if isinstance(v,(int,float)) else f"{labels.get(k,k)}={v}" for k,v in fixed.items())
     warning = "\n" + " ".join(notices) if notices else ""
-    figure.suptitle(f"模型预测切片 | 数据版本 {revision}\n固定条件：{fixed_text}{warning}",fontsize=9,fontproperties=font)
+    fixed_label = "固定设定值（所选输入仍有执行波动）" if with_input else "固定条件"
+    figure.suptitle(f"模型预测切片 | 数据版本 {revision}\n{fixed_label}：{fixed_text}{warning}",fontsize=9,fontproperties=font)
     figure.savefig(path,dpi=140)
-    return {"revision":revision,"template_version":template.data["template_version"],"conditions":conditions,"predictions":predictions,"fixed":fixed,"ranges":ranges,"interval_kind":"latent_response","seed":seed,"notices":notices}
+    return {"revision":revision,"template_version":template.data["template_version"],"conditions":conditions,"predictions":predictions,"fixed":fixed,"ranges":ranges,"interval_kind":"latent_response_with_input_uncertainty" if with_input else "latent_response","seed":seed,"notices":notices}

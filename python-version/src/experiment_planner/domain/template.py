@@ -176,6 +176,8 @@ class Template:
             for key in constraint["coefficients"]:
                 if fields[key].get("value_type", "float") not in ("float", "int"):
                     raise ValidationError("线性约束仅支持数值输入")
+        from experiment_planner.domain.input_uncertainty import validate_input_uncertainty
+        validate_input_uncertainty(self)
 
     def _validate_parameter(self, field, value, execution=True):
         value = parse_value(value, field)

@@ -1,5 +1,26 @@
 # Python 源码版验证报告
 
+## 可选输入不确定度 · 2026-10-13
+
+本目录 Linux / Python 3.12 / Qt offscreen 环境验证 **363 项不同测试**：59 项单元、256 项集成、48 项相关界面测试。包括本次新增的 **47 项**（38 项计算/集成、9 项界面）。
+
+首次综合运行结果为 **362 passed、1 failed**，236.64 秒：[日志](evidence/input-uncertainty-2026-10-13/tests.txt)、[JUnit](evidence/input-uncertainty-2026-10-13/tests.xml)。唯一失败是通用帮助文档的既有材料名称例子不符合“通用说明不绑定内置模板”的检查；将其改成通用厚度例子后，仅重跑该项，结果 **1 passed**，4.74 秒：[复查日志](evidence/input-uncertainty-2026-10-13/help-recheck.txt)、[JUnit](evidence/input-uncertainty-2026-10-13/help-recheck.xml)。最终上述 363 项均有通过结果，不将重复运行累计为新测试。综合运行含 21 条依赖弃用、矩阵 jitter 和合成布尔约束全不满足的采集函数提示，没有将警告屏蔽或把失败日志改写为通过。
+
+综合运行覆盖全部 `tests/unit`、`tests/integration`，以及 GUI 的 `test_input_uncertainty_ui.py`、`test_template_workflow.py`、`test_general_templates.py`、`test_plot_ranges.py`、`test_failure_diagnostics.py`。使用 `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest ... -q -p no:cacheprovider`。未重跑其他 GUI 文件。
+
+新增验证包括：
+
+- 开关默认关闭，与没有新配置的模板得到完全相同的预测和推荐；只扰动勾选输入，关闭后保存已有设置。
+- 正态/均匀条件采样、边界均值解析对照、相同种子复现、线性约束、无可行体积时的明确失败及非法尺度拒绝。
+- 线性均匀分布解析分位数对照；非线性目标先逐样本变换再平均；合成窄峰名义值更高、宽峰平均表现更好的对照。
+- GP/RBF、GP/Matérn、贝叶斯线性 × 单目标/加权/Pareto 的九种组合，含输出约束、探索、多候选及待做点；布尔与数值混合响应、派生公式和严格 JSON 序列化。
+- 真实后台进程的预测/推荐返回、新配置保存/撤销/重做、字段改名、JSON/Excel 模板往返、两种预测口径导出及趋势图；训练记录及原始输入保持不变。
+- 鼠标开启与逐项勾选、非法输入提示、模板页面重建、150% 字体与缩小窗口的保存按钮可用性。
+
+已查看 [默认关闭](evidence/input-uncertainty-2026-10-13/default-off.png)、[仅时间开启](evidence/input-uncertainty-2026-10-13/selected-input.png)、[放大字体](evidence/input-uncertainty-2026-10-13/font150-small.png)、[预测对照页面](evidence/input-uncertainty-2026-10-13/prediction.png)、[含输入波动的趋势图](evidence/input-uncertainty-2026-10-13/trend.png)。放大字体时表格可滚动，窗口受既有工具栏最小宽度限制。合成预测的完整 [JSON](evidence/input-uncertainty-2026-10-13/prediction.json)、[CSV](evidence/input-uncertainty-2026-10-13/prediction.csv)、[Excel](evidence/input-uncertainty-2026-10-13/prediction.xlsx) 也已保存；无用户实验数据。
+
+结果表示有限输入采样与模型后验传播，尾部分位数会受采样数/种子影响；推荐按平均目标而非最坏情况评分。历史输入误差训练、输入相关噪声、真实机台标定、Windows 实机及 Python 3.13 本轮未验证。当前边界条件见 [功能边界](coverage.md)，不能据合成验证宣称实际预测一定更准。
+
 ## 非有限预测区间显示与诊断 · 2026-10-13
 
 在本目录独立 Linux / Python 3.12 / Qt offscreen 环境完成 **143 项不同测试，0 失败、0 跳过**，包含 33 项新增回归：

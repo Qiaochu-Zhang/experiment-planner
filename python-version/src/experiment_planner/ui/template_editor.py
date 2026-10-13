@@ -70,7 +70,7 @@ class TemplateEditor(DraftDialog):
         exchange.addStretch()
         self.tabs=QTabWidget();outer.addWidget(self.tabs)
         self.build_pages()
-        self.tabs.setCurrentIndex({"precision":0,"priors":1,"objectives":2}.get(section,0))
+        self.tabs.setCurrentIndex({"precision":0,"priors":1,"objectives":2,"input_uncertainty":3}.get(section,0))
         self.buttons=chinese_buttons(QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel))
         self.buttons.accepted.connect(self.save);self.buttons.rejected.connect(self.reject);outer.addWidget(self.buttons)
         initial = copy.deepcopy(self.data)
@@ -194,6 +194,9 @@ class TemplateEditor(DraftDialog):
         newer.setVisible({"sio2_loss_nm","sin_loss_nm"} <= {f["name"] for f in self.data.get("derived_metrics",[])})
         newer.clicked.connect(self.new_goals);layout.addWidget(newer)
         self.tabs.addTab(page,"实验优化目标")
+        from experiment_planner.ui.input_uncertainty import InputUncertaintyEditor
+        self.input_uncertainty = InputUncertaintyEditor(self.data)
+        self.tabs.addTab(self.input_uncertainty, "输入不确定度")
 
     def import_excel(self):
         from experiment_planner.io.template_excel import read_template_excel
@@ -264,6 +267,7 @@ class TemplateEditor(DraftDialog):
         if self.optimization.currentData()=="weighted":data["optimization"].update(weights=weights,scales=scales)
         else:data["optimization"].update(weights=None,scales=None)
         data.setdefault("ratio_policy",{}).update(mode=self.ratio.currentData(),epsilon_nm=self.epsilon.value() if self.ratio.currentData() in ("stabilized","valid_region") else None)
+        self.input_uncertainty.apply_to(data)
         return data
 
     def new_goals(self):

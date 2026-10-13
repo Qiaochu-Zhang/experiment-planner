@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="4.740" timestamp="2026-10-13T08:15:00.744563+00:00" hostname="ip-172-31-25-134"><testcase classname="tests.gui.test_general_templates" name="test_generic_help_has_no_default_template_topics" time="0.188" /></testsuite></testsuites>

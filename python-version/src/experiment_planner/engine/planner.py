@@ -14,6 +14,7 @@ from experiment_planner.engine.objectives import Objectives, prediction_summary
 from experiment_planner.engine.space import BatchRequest, candidate_pool, changes, key
 from experiment_planner.knowledge.priors import check_capabilities
 from experiment_planner.engine.exploration import candidate_statistics, adjusted_scores, dedicated_scores
+from experiment_planner.domain.input_uncertainty import uncertainty_info, INPUT_UNCERTAINTY_NOTICE
 
 
 def generate(snapshot, request):
@@ -64,6 +65,13 @@ def generate(snapshot, request):
         fitted = model, encoder, names
         stage = "model_driven"
         objectives = Objectives(template, names)
+        input_info = uncertainty_info(template)
+        if input_info:
+            from experiment_planner.engine.input_uncertainty import InputDistribution, ExpectedInputModel, ExpectedObjectives
+            model = ExpectedInputModel(model, InputDistribution(template, encoder, request.seed), objectives)
+            objectives = ExpectedObjectives(objectives)
+            notices.append(INPUT_UNCERTAINTY_NOTICE)
+            notices.append("推荐按输入扰动后的平均有向目标计算改进；输出约束要求全部扰动采样点通过，属于有限采样近似，不是全范围保证。")
         all_conditions = []
         seen = set()
         for dataset in datasets.values():
@@ -86,7 +94,7 @@ def generate(snapshot, request):
                     reference = (means.amin(0) - .1 * (means.amax(0)-means.amin(0)).clamp_min(1)).tolist()
                     notices.append("参考点按有向目标的后验均值最小值减 10% 范围生成，已保存在本批次；最小化目标在有向空间为负值")
                 if len(reference) != len(objectives.objectives): raise ValidationError("Pareto 参考点维数不符")
-                acquisition = qLogNoisyExpectedHypervolumeImprovement(model=model, ref_point=reference, X_baseline=baseline, sampler=sampler, objective=objectives.botorch_objective(), constraints=objectives.constraints() or None, X_pending=pending, cache_root=False, cache_pending=True)
+                acquisition = qLogNoisyExpectedHypervolumeImprovement(model=model, ref_point=reference, X_baseline=baseline, sampler=sampler, objective=objectives.botorch_objective(), constraints=objectives.constraints() or None, X_pending=pending, cache_root=False, cache_pending=not bool(input_info), prune_baseline=False)
             elif config["mode"] in ("single", "weighted"):
                 acquisition = qLogNoisyExpectedImprovement(model=model, X_baseline=baseline, sampler=sampler, objective=objectives.botorch_objective(), constraints=objectives.constraints() or None, X_pending=pending, cache_root=False)
             else: raise ValidationError("未知优化模式")
@@ -100,7 +108,7 @@ def generate(snapshot, request):
                 feasibility = torch.ones(len(pool), dtype=torch.double)
             while pool and len(candidates) < request.n:
                 X = encoder.encode(pool)
-                scores = torch.cat([acquisition(chunk.unsqueeze(-2)).reshape(-1) for chunk in X.split(16)])
+                scores = torch.cat([acquisition(chunk.unsqueeze(-2)).reshape(-1) for chunk in X.split(4 if input_info else 16)])
                 if not torch.isfinite(scores).all(): raise CapabilityError("采集函数返回非有限评分，未保存批次")
                 if remaining_exploration:
                     selection_scores = dedicated_scores(X, uncertainty, feasibility, encoder.encode(pending_conditions) if pending_conditions else None)
@@ -123,6 +131,8 @@ def generate(snapshot, request):
             candidates.append({"conditions": condition, "arrangement": "exploration" if i < request.exploration_count else "initialization"})
         if request.exploration_count:
             notices.append("数据不足，专门探索名额使用初始化候选；其余新条件也处于初始化阶段，尚未执行模型优化")
+        if uncertainty_info(template):
+            notices.append("输入不确定度已配置；当前数据不足，初始化推荐尚未进行输入波动预测或稳健评分。")
     if fitted and candidates:
         predictions = prediction_summary(*fitted, template, [c["conditions"] for c in candidates], seed=request.seed)
     else: predictions = [None] * len(candidates)
@@ -136,4 +146,6 @@ def generate(snapshot, request):
         shortfall = "完整交叉布局已返回；其余配额未自动追加实验" if request.mode == "cross" else "当前合法候选池不足（含冻结、网格、约束与历史去重）；未放宽条件；有限采样不证明全空间无解"
     if request.show_trend_plots: notices.append("本批次保存趋势图请求；当前原型需通过独立分析接口生成切片，尚未自动生成批次图")
     exploration_info["actual_count"] = sum(c["arrangement"] == "exploration" for c in candidates)
+    if uncertainty_info(template):
+        exploration_info["input_uncertainty"] = uncertainty_info(template)
     return {"revision": snapshot["revision"], "template_version": template.data["template_version"], "request": asdict(request), "stage": stage, "candidates": candidates, "shortfall": shortfall, "notices": notices, "reference_point": reference, "exploration": exploration_info, "model_datasets": datasets, "ax_snapshot": ax_snapshot(ax_experiment, ax_mapping), "versions": {p: importlib.metadata.version(p) for p in ("ax-platform", "botorch", "torch")}}

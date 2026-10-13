@@ -17,6 +17,12 @@ def check_capabilities(template, preset):
         raise CapabilityError("当前引擎至少需要一个模型输入")
     if any(f.get("use_as_model_input") for f in template.measurements + template.metrics):
         raise CapabilityError("当前引擎尚未支持额外实验前条件或派生输入；模板可保存，推荐已阻止")
+    if template.data.get("input_uncertainty", {}).get("enabled", False):
+        for constraint in template.data.get("input_constraints", []):
+            if any(not inputs[name].get("use_as_model_input", True)
+                   or inputs[name].get("value_type", "float") not in ("float", "int", "bool")
+                   for name in constraint["coefficients"]):
+                raise CapabilityError("输入不确定度与线性约束组合时，约束中的输入须全部参与数值模型")
     for prior in template.data.get("knowledge_priors", []):
         if not prior.get("enabled", True): continue
         if prior.get("response") not in base or prior.get("input") not in inputs:
@@ -42,5 +48,3 @@ def check_capabilities(template, preset):
     for field in template.fields:
         if field.get("modeling_rounding", {}).get("mode", "none") != "none":
             raise CapabilityError("建模取整变换尚未接入；显示与执行取整可用")
-        if field in template.parameters and field.get("input_uncertainty"):
-            raise CapabilityError("输入位置误差尚未接入预测积分")

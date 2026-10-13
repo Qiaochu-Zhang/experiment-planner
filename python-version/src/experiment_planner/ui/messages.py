@@ -96,6 +96,8 @@ def _interval_lines(item, name, label, template, *, objective=False):
 
 def prediction_lines(prediction, labels, template):
     lines = []
+    if prediction.get("input_uncertainty"):
+        lines.append("  以下目标预测及可行概率已考虑所选输入的执行波动。")
     for item in prediction.get("objective_predictions", []):
         name = item["definition"]["metric"]
         lines.extend(_interval_lines(item, name, labels.get(name, name), template, objective=True))
@@ -108,10 +110,15 @@ def analysis_text(report, template):
     lines = ["预测区间表示潜在响应，不包含额外的未来量测误差。"]
     for i, prediction in enumerate(report["predictions"], 1):
         lines.append(f"\n条件 {i}")
-        for name, item in prediction.items():
-            if not isinstance(item, dict) or "quantiles" not in item: continue
-            label = labels.get(name, {"raw_selectivity":"原始刻蚀量比值", "raw_selectivity_abs":"原始比值绝对值", "selectivity_stable":"稳定化比值"}.get(name,name))
-            lines.extend(_interval_lines(item, name, label, template))
-        lines.extend(prediction_lines(prediction, labels, template))
+        variants = [(None, prediction)]
+        if "nominal_prediction" in prediction:
+            variants = [("输入确定时", prediction["nominal_prediction"]), ("考虑输入执行波动后", prediction)]
+        for title, variant in variants:
+            if title: lines.append(title + "：")
+            for name, item in variant.items():
+                if not isinstance(item, dict) or "quantiles" not in item: continue
+                label = labels.get(name, {"raw_selectivity":"原始刻蚀量比值", "raw_selectivity_abs":"原始比值绝对值", "selectivity_stable":"稳定化比值"}.get(name,name))
+                lines.extend(_interval_lines(item, name, label, template))
+            lines.extend(prediction_lines(variant, labels, template))
     lines += ["\n提示：" + n for n in report.get("notices", [])]
     return "\n".join(lines)

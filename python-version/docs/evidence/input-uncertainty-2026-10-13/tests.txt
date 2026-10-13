@@ -1,0 +1,51 @@
+........................................................................ [ 19%]
+........................................................................ [ 39%]
+........................................................................ [ 59%]
+........................................................................ [ 79%]
+.........................................................F.............. [ 99%]
+...                                                                      [100%]
+=================================== FAILURES ===================================
+_______________ test_generic_help_has_no_default_template_topics _______________
+
+qt_application = <PySide6.QtWidgets.QApplication(0xd44b2e0) at 0x7986e4d1f280>
+
+    def test_generic_help_has_no_default_template_topics(qt_application):
+        text = help_path().read_text(encoding='utf-8')
+        for word in ('cl2', 'Cl2', 'SiO2', 'SiN', 'BCl3', 'sio2_loss_nm'):
+>           assert word not in text
+E           AssertionError: assert 'SiO2' not in '# 实验规划助手 · ...合直觉强行加入斜率。\n'
+E
+E             'SiO2' is contained here:
+E               原始测量，例如选择 SiO2 刻蚀量会同时勾选初始和剩余 SiO2 厚度，也可按单位选择。“读取已有共同 1σ”只在所选范围的已知误差数值一致且单位一致时填入；没有共同值时需手动填写，不自动估计基准。底部固定显示修改汇总，“展开逐项修改预览”显示实验、字段、单位、修改前后 1σ 及基准/高可信类别；最多展示前 200 项，超过时会提示实际总量。未测值继续跳过，设置不会继承到未来新记录。
+E             ?           ++++
+E
+E               ## 导入与结束标记
+E               ...
+E
+E             ...Full output truncated (78 lines hidden), use '-vv' to show
+
+tests/gui/test_general_templates.py:171: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117: DeprecationWarning: ax.service.utils.orchestrator_options has been moved to ax.orchestration.orchestrator_options. Please update imports to use: from ax.orchestration.orchestrator_options import OrchestratorOptions, TrialType. This backward compatibility shim will be removed in a future release.
+    from ax.service.utils.orchestrator_options import OrchestratorOptions, TrialType
+
+.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39: DeprecationWarning: ax.service.orchestrator has been moved to ax.orchestration.orchestrator. Please update imports to use: from ax.orchestration.orchestrator import Orchestrator. This backward compatibility shim will be removed in a future release.
+    from ax.service.orchestrator import OrchestratorOptions
+
+tests/integration/test_input_uncertainty.py: 6 warnings
+tests/integration/test_models.py: 7 warnings
+tests/integration/test_time_dependence.py: 1 warning
+tests/integration/test_v02_strategy.py: 4 warnings
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/linear_operator/utils/cholesky.py:41: NumericalWarning: A not p.d., added jitter of 1.0e-08 to the diagonal
+    warnings.warn(
+
+tests/integration/test_input_uncertainty.py::test_mixed_boolean_response_and_derived_metric_under_input_noise
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/botorch/acquisition/logei.py:577: BotorchWarning: When all training points are infeasible, it is better to use q(Log)ProbabilityOfFeasibility.
+    return compute_best_feasible_objective(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/gui/test_general_templates.py::test_generic_help_has_no_default_template_topics
+1 failed, 362 passed, 21 warnings in 236.64s (0:03:56)

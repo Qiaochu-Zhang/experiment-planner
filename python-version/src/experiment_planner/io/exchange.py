@@ -293,17 +293,23 @@ def export_analysis(report, template, path):
     rows = []
     for source, data in (("预测", report), ("趋势图", report.get("plot", {}))):
         for index, (condition, prediction) in enumerate(zip(data.get("conditions", []), data.get("predictions", [])), 1):
-            for name, item in prediction.items():
-                if not isinstance(item, dict) or "quantiles" not in item: continue
-                q = item.get("quantiles") or [None, None, None]
-                field = next((f for f in template.fields if f["name"] == name), {})
-                rows.append({"来源": source, "点序号": index, "数据版本": report["revision"],
-                    "模板版本": report["template_version"], "模型": report["model"], "随机种子": prediction.get("seed"),
-                    **condition, "指标": name, "指标名称": field.get("label", name), "单位": field.get("unit", "1"),
-                    "后验均值": item.get("mean"), "下限2.5%": q[0], "中位数50%": q[1], "上限97.5%": q[2],
-                    "区间类型": item.get("interval_kind"), "预测可行概率": prediction.get("feasibility_probability"),
-                    "有限样本数": item.get("finite_sample_count"), "非有限样本数": item.get("nonfinite_sample_count"),
-                    "说明": item.get("moment_notice", "")})
+            variants = [("输入确定", prediction)]
+            if "nominal_prediction" in prediction:
+                variants = [("输入确定", prediction["nominal_prediction"]), ("含输入执行波动", prediction)]
+            for interpretation, variant in variants:
+                for name, item in variant.items():
+                    if not isinstance(item, dict) or "quantiles" not in item: continue
+                    q = item.get("quantiles") or [None, None, None]
+                    field = next((f for f in template.fields if f["name"] == name), {})
+                    rows.append({"来源": source, "点序号": index, "数据版本": report["revision"],
+                        "模板版本": report["template_version"], "模型": report["model"], "随机种子": variant.get("seed"),
+                        **condition, "指标": name, "指标名称": field.get("label", name), "单位": field.get("unit", "1"),
+                        "后验均值": item.get("mean"), "下限2.5%": q[0], "中位数50%": q[1], "上限97.5%": q[2],
+                        "区间类型": item.get("interval_kind"), "预测可行概率": variant.get("feasibility_probability"),
+                        "有限样本数": item.get("finite_sample_count"), "非有限样本数": item.get("nonfinite_sample_count"),
+                        "计算口径": interpretation,
+                        "输入不确定度配置": json.dumps(prediction["input_uncertainty"], ensure_ascii=False, allow_nan=False) if prediction.get("input_uncertainty") else "未启用",
+                        "说明": item.get("moment_notice", "")})
     if not rows: raise ValidationError("请先完成预测或趋势图计算")
     headers = list(rows[0])
     write_table(path, headers, rows, "预测与趋势数据")

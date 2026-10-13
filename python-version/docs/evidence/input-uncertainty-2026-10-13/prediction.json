@@ -1,0 +1,2301 @@
+{
+  "revision": 3,
+  "template_version": 1,
+  "model": "bayesian_linear_v1",
+  "conditions": [
+    {
+      "x": 0.5,
+      "z": 0.3
+    }
+  ],
+  "notices": [
+    "各基础响应条件独立；同一响应保留候选点间相关性",
+    "区间表示潜在响应，不包含未提供的未来测量误差",
+    "y：有效训练记录中的 z 只有一个取值；无法从这些数据识别其影响，平坦预测不代表物理无关",
+    "已考虑所选输入的未来执行波动：各输入原始扰动独立，并假设实际执行限制在模板范围与线性约束内（条件分布采样）。正态 1σ / 均匀最大偏差均指截断前分布；靠近边界时实际均值与标准差会改变。历史输入仍按记录值训练；结果不包含额外未来量测噪声。",
+    "趋势图已包含所选输入的执行波动；输入确定时的对照结果保存在技术详情和导出表中。"
+  ],
+  "model_datasets": {
+    "y": {
+      "count": 3,
+      "features": [
+        "x",
+        "z"
+      ],
+      "feature_ranges": {
+        "x": {
+          "unique_count": 3,
+          "min": 0.1,
+          "max": 0.8
+        },
+        "z": {
+          "unique_count": 1,
+          "min": 0.3,
+          "max": 0.3
+        }
+      },
+      "conditions": [
+        {
+          "x": 0.1,
+          "z": 0.3
+        },
+        {
+          "x": 0.4,
+          "z": 0.3
+        },
+        {
+          "x": 0.8,
+          "z": 0.3
+        }
+      ]
+    }
+  },
+  "predictions": [
+    {
+      "y": {
+        "mean": 2.0047885851098317,
+        "quantiles": [
+          1.4899785412214779,
+          2.00888370841932,
+          2.5236846291940225
+        ],
+        "sample_count": 512,
+        "finite_sample_count": 512,
+        "nonfinite_sample_count": 0,
+        "nonfinite_counts": {
+          "nan": 0,
+          "positive_infinity": 0,
+          "negative_infinity": 0
+        },
+        "summary_status": "ok",
+        "summary_notice": "",
+        "interval_kind": "latent_response_with_input_uncertainty",
+        "source": "posterior_and_conditional_input_samples",
+        "moment_notice": ""
+      },
+      "feasibility_probability": 1.0,
+      "samples": 512,
+      "seed": 3,
+      "objective_predictions": [
+        {
+          "mean": 2.0047885851098317,
+          "quantiles": [
+            1.4899785412214779,
+            2.00888370841932,
+            2.5236846291940225
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "definition": {
+            "direction": "maximize",
+            "metric": "y"
+          },
+          "ratio_policy": "remove",
+          "notice": ""
+        }
+      ],
+      "nominal_prediction": {
+        "y": {
+          "mean": 1.9985658182134036,
+          "quantiles": [
+            1.9406902831274866,
+            1.9988981198402402,
+            2.0501030440862884
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response",
+          "source": "joint_posterior_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.9985658182134036,
+            "quantiles": [
+              1.9406902831274866,
+              1.9988981198402402,
+              2.0501030440862884
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ]
+      },
+      "input_uncertainty": {
+        "enabled": true,
+        "samples": 16,
+        "scope": "future_execution_only",
+        "boundary_policy": "condition_on_template_bounds_and_constraints",
+        "dependence": "independent_before_constraint_conditioning",
+        "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+        "parameters": [
+          {
+            "name": "x",
+            "label": "流量",
+            "unit": "1",
+            "amount": 0.08,
+            "enabled": true,
+            "kind": "std",
+            "note": "合成假设"
+          }
+        ],
+        "seed": 3,
+        "posterior_function_samples": 32,
+        "mixture_samples": 512,
+        "realized_inputs": {
+          "x": {
+            "sample_mean": 0.49974678499635283,
+            "sample_std": 0.10696858696022764,
+            "min": 0.2442624561894901,
+            "max": 0.7522732880781766
+          }
+        }
+      }
+    }
+  ],
+  "input_uncertainty": {
+    "enabled": true,
+    "samples": 16,
+    "scope": "future_execution_only",
+    "boundary_policy": "condition_on_template_bounds_and_constraints",
+    "dependence": "independent_before_constraint_conditioning",
+    "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+    "parameters": [
+      {
+        "name": "x",
+        "label": "流量",
+        "unit": "1",
+        "amount": 0.08,
+        "enabled": true,
+        "kind": "std",
+        "note": "合成假设"
+      }
+    ]
+  },
+  "plot": {
+    "revision": 3,
+    "template_version": 1,
+    "conditions": [
+      {
+        "x": 0.0,
+        "z": 0.3
+      },
+      {
+        "x": 0.07142857142857142,
+        "z": 0.3
+      },
+      {
+        "x": 0.14285714285714285,
+        "z": 0.3
+      },
+      {
+        "x": 0.21428571428571427,
+        "z": 0.3
+      },
+      {
+        "x": 0.2857142857142857,
+        "z": 0.3
+      },
+      {
+        "x": 0.3571428571428571,
+        "z": 0.3
+      },
+      {
+        "x": 0.42857142857142855,
+        "z": 0.3
+      },
+      {
+        "x": 0.5,
+        "z": 0.3
+      },
+      {
+        "x": 0.5714285714285714,
+        "z": 0.3
+      },
+      {
+        "x": 0.6428571428571428,
+        "z": 0.3
+      },
+      {
+        "x": 0.7142857142857142,
+        "z": 0.3
+      },
+      {
+        "x": 0.7857142857142857,
+        "z": 0.3
+      },
+      {
+        "x": 0.8571428571428571,
+        "z": 0.3
+      },
+      {
+        "x": 0.9285714285714285,
+        "z": 0.3
+      },
+      {
+        "x": 1.0,
+        "z": 0.3
+      }
+    ],
+    "predictions": [
+      {
+        "y": {
+          "mean": 1.1327634172878471,
+          "quantiles": [
+            0.9532674446394617,
+            1.1084225399249519,
+            1.5320053538112604
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.1327634172878471,
+            "quantiles": [
+              0.9532674446394617,
+              1.1084225399249519,
+              1.5320053538112604
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 0.9975803638190546,
+            "quantiles": [
+              0.8954308015806101,
+              0.9981668718429043,
+              1.088542893220879
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 0.9975803638190546,
+              "quantiles": [
+                0.8954308015806101,
+                0.9981668718429043,
+                1.088542893220879
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.06938635835379019,
+              "sample_std": 0.06397706589377916,
+              "min": 6.968431521641565e-05,
+              "max": 0.26803451441840426
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 1.2186794522926907,
+          "quantiles": [
+            0.9842619257880221,
+            1.1943297310684797,
+            1.6709903933550736
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.2186794522926907,
+            "quantiles": [
+              0.9842619257880221,
+              1.1943297310684797,
+              1.6709903933550736
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 1.1408839694797208,
+            "quantiles": [
+              1.050455075664193,
+              1.1411503227217854,
+              1.2221626472583171
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 1.1408839694797208,
+              "quantiles": [
+                1.050455075664193,
+                1.1411503227217854,
+                1.2221626472583171
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.10332219197406356,
+              "sample_std": 0.0777914550940805,
+              "min": 0.0001688521390603992,
+              "max": 0.3284676065007166
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 1.3007048760242568,
+          "quantiles": [
+            0.9857271477501444,
+            1.2863171800004165,
+            1.7921175022613502
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.3007048760242568,
+            "quantiles": [
+              0.9857271477501444,
+              1.2863171800004165,
+              1.7921175022613502
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 1.284189738141941,
+            "quantiles": [
+              1.2053788122010847,
+              1.2838745500363868,
+              1.3588739620745476
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 1.284189738141941,
+              "quantiles": [
+                1.2053788122010847,
+                1.2838745500363868,
+                1.3588739620745476
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.15425071123178405,
+              "sample_std": 0.09040283591784964,
+              "min": 0.0006561646096113205,
+              "max": 0.39601123710879366
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 1.4292243427597957,
+          "quantiles": [
+            0.9852240389769079,
+            1.4243670092978884,
+            1.945732928653338
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.4292243427597957,
+            "quantiles": [
+              0.9852240389769079,
+              1.4243670092978884,
+              1.945732928653338
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 1.4274939220372331,
+            "quantiles": [
+              1.3595133945196771,
+              1.4274121955618408,
+              1.495243423146389
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 1.4274939220372331,
+              "quantiles": [
+                1.3595133945196771,
+                1.4274121955618408,
+                1.495243423146389
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.21738856806598816,
+              "sample_std": 0.10026151101899956,
+              "min": 0.00464094576276583,
+              "max": 0.4666454788006077
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 1.5791743415361452,
+          "quantiles": [
+            1.0851655273468594,
+            1.5800878852071407,
+            2.086724175019135
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.5791743415361452,
+            "quantiles": [
+              1.0851655273468594,
+              1.5800878852071407,
+              2.086724175019135
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 1.570801382762906,
+            "quantiles": [
+              1.5123395532763488,
+              1.5709304023424677,
+              1.6325188170703364
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 1.570801382762906,
+              "quantiles": [
+                1.5123395532763488,
+                1.5709304023424677,
+                1.6325188170703364
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.2858148777558131,
+              "sample_std": 0.10617395009468805,
+              "min": 0.035270292287659655,
+              "max": 0.5379917252363531
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 1.714874482070523,
+          "quantiles": [
+            1.2057713663061322,
+            1.7151546671922901,
+            2.21787657879894
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.714874482070523,
+            "quantiles": [
+              1.2057713663061322,
+              1.7151546671922901,
+              2.21787657879894
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 1.7141040354114838,
+            "quantiles": [
+              1.659732637670613,
+              1.7144912873849223,
+              1.7726505375530563
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 1.7141040354114838,
+              "quantiles": [
+                1.659732637670613,
+                1.7144912873849223,
+                1.7726505375530563
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.3568984701544673,
+              "sample_std": 0.106948542008245,
+              "min": 0.10153824078812973,
+              "max": 0.6094162449455548
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 1.8675441929369931,
+          "quantiles": [
+            1.3584602220242505,
+            1.8679249843987922,
+            2.382621623701623
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.8675441929369931,
+            "quantiles": [
+              1.3584602220242505,
+              1.8679249843987922,
+              2.382621623701623
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 1.857410364070349,
+            "quantiles": [
+              1.8031425411379722,
+              1.8580917118431306,
+              1.9157967660862865
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 1.857410364070349,
+              "quantiles": [
+                1.8031425411379722,
+                1.8580917118431306,
+                1.9157967660862865
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.42831830665150233,
+              "sample_std": 0.10696837731229952,
+              "min": 0.17283528067709303,
+              "max": 0.680844723553183
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 1.9992091488229948,
+          "quantiles": [
+            1.4748045106963121,
+            1.9982701811172157,
+            2.5048258841163684
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 1.9992091488229948,
+            "quantiles": [
+              1.4748045106963121,
+              1.9982701811172157,
+              2.5048258841163684
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 2.0007189648808232,
+            "quantiles": [
+              1.9441777402261617,
+              2.000860621897811,
+              2.061041165039748
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 2.0007189648808232,
+              "quantiles": [
+                1.9441777402261617,
+                2.000860621897811,
+                2.061041165039748
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.49974678499635283,
+              "sample_std": 0.10696858696022764,
+              "min": 0.2442624561894901,
+              "max": 0.7522732880781766
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 2.142196711796425,
+          "quantiles": [
+            1.6224425240622624,
+            2.1422193082929013,
+            2.6565903642724678
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 2.142196711796425,
+            "quantiles": [
+              1.6224425240622624,
+              2.1422193082929013,
+              2.6565903642724678
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 2.1440228506309897,
+            "quantiles": [
+              2.081543471287661,
+              2.1439002747547504,
+              2.205981840534021
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 2.1440228506309897,
+              "quantiles": [
+                2.081543471287661,
+                2.1439002747547504,
+                2.205981840534021
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.5711752745126379,
+              "sample_std": 0.1069684063307977,
+              "min": 0.3156910198524494,
+              "max": 0.8237006430371441
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 2.2872310932372057,
+          "quantiles": [
+            1.7630105199377268,
+            2.2861293880465663,
+            2.806945841548931
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 2.2872310932372057,
+            "quantiles": [
+              1.7630105199377268,
+              2.2861293880465663,
+              2.806945841548931
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 2.287326329713084,
+            "quantiles": [
+              2.21918679491943,
+              2.286973425939546,
+              2.358794377693655
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 2.287326329713084,
+              "quantiles": [
+                2.21918679491943,
+                2.286973425939546,
+                2.358794377693655
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.6425961661377423,
+              "sample_std": 0.10695128511914952,
+              "min": 0.38711949954172814,
+              "max": 0.8950145488539785
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 2.427460149760415,
+          "quantiles": [
+            1.9173277414264198,
+            2.4278945369373752,
+            2.939766716086781
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 2.427460149760415,
+            "quantiles": [
+              1.9173277414264198,
+              2.4278945369373752,
+              2.939766716086781
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 2.430630299063095,
+            "quantiles": [
+              2.3530544118945707,
+              2.43009466598594,
+              2.512829719475258
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 2.430630299063095,
+              "quantiles": [
+                2.3530544118945707,
+                2.43009466598594,
+                2.512829719475258
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.7137172476386161,
+              "sample_std": 0.10627298041155522,
+              "min": 0.45854406655712754,
+              "max": 0.9618816202551114
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 2.5646941840982476,
+          "quantiles": [
+            2.0505864288669398,
+            2.567548025166718,
+            3.0067403344916848
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 2.5646941840982476,
+            "quantiles": [
+              2.0505864288669398,
+              2.567548025166718,
+              3.0067403344916848
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 2.5739372195924712,
+            "quantiles": [
+              2.4865201037995797,
+              2.5734712280601437,
+              2.668876241207934
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 2.5739372195924712,
+              "quantiles": [
+                2.4865201037995797,
+                2.5734712280601437,
+                2.668876241207934
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.782279623978875,
+              "sample_std": 0.10071017088955095,
+              "min": 0.5298912739228923,
+              "max": 0.9946742230063133
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 2.696253974757455,
+          "quantiles": [
+            2.197926208936293,
+            2.7099318118769977,
+            3.022996384868614
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 2.696253974757455,
+            "quantiles": [
+              2.197926208936293,
+              2.7099318118769977,
+              3.022996384868614
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 2.7172430959773672,
+            "quantiles": [
+              2.6193099372267,
+              2.7164583339387507,
+              2.8238258796291222
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 2.7172430959773672,
+              "quantiles": [
+                2.6193099372267,
+                2.7164583339387507,
+                2.8238258796291222
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.8454601029353472,
+              "sample_std": 0.09097310331632841,
+              "min": 0.6005347617028627,
+              "max": 0.9992391175888954
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 2.798564793567425,
+          "quantiles": [
+            2.338940996371722,
+            2.8204031370413416,
+            3.0405159856383435
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 2.798564793567425,
+            "quantiles": [
+              2.338940996371722,
+              2.8204031370413416,
+              3.0405159856383435
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 2.8605463711072128,
+            "quantiles": [
+              2.7513038848211995,
+              2.857493424760226,
+              2.9775673589580602
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 2.8605463711072128,
+              "quantiles": [
+                2.7513038848211995,
+                2.857493424760226,
+                2.9775673589580602
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.8964087417431262,
+              "sample_std": 0.07841715224477792,
+              "min": 0.6681229534101234,
+              "max": 0.9998040014631127
+            }
+          }
+        }
+      },
+      {
+        "y": {
+          "mean": 2.862228015645365,
+          "quantiles": [
+            2.4524636966709377,
+            2.8877342364369705,
+            3.0559154747111474
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "interval_kind": "latent_response_with_input_uncertainty",
+          "source": "posterior_and_conditional_input_samples",
+          "moment_notice": ""
+        },
+        "feasibility_probability": 1.0,
+        "samples": 512,
+        "seed": 3,
+        "objective_predictions": [
+          {
+            "mean": 2.862228015645365,
+            "quantiles": [
+              2.4524636966709377,
+              2.8877342364369705,
+              3.0559154747111474
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "definition": {
+              "direction": "maximize",
+              "metric": "y"
+            },
+            "ratio_policy": "remove",
+            "notice": ""
+          }
+        ],
+        "nominal_prediction": {
+          "y": {
+            "mean": 3.0038508559536004,
+            "quantiles": [
+              2.884092327357458,
+              3.0004237341348583,
+              3.132423915087784
+            ],
+            "sample_count": 512,
+            "finite_sample_count": 512,
+            "nonfinite_sample_count": 0,
+            "nonfinite_counts": {
+              "nan": 0,
+              "positive_infinity": 0,
+              "negative_infinity": 0
+            },
+            "summary_status": "ok",
+            "summary_notice": "",
+            "interval_kind": "latent_response",
+            "source": "joint_posterior_samples",
+            "moment_notice": ""
+          },
+          "feasibility_probability": 1.0,
+          "samples": 512,
+          "seed": 3,
+          "objective_predictions": [
+            {
+              "mean": 3.0038508559536004,
+              "quantiles": [
+                2.884092327357458,
+                3.0004237341348583,
+                3.132423915087784
+              ],
+              "sample_count": 512,
+              "finite_sample_count": 512,
+              "nonfinite_sample_count": 0,
+              "nonfinite_counts": {
+                "nan": 0,
+                "positive_infinity": 0,
+                "negative_infinity": 0
+              },
+              "summary_status": "ok",
+              "summary_notice": "",
+              "definition": {
+                "direction": "maximize",
+                "metric": "y"
+              },
+              "ratio_policy": "remove",
+              "notice": ""
+            }
+          ]
+        },
+        "input_uncertainty": {
+          "enabled": true,
+          "samples": 16,
+          "scope": "future_execution_only",
+          "boundary_policy": "condition_on_template_bounds_and_constraints",
+          "dependence": "independent_before_constraint_conditioning",
+          "recommendation": "expected_objectives_with_all_sampled_outcomes_feasible",
+          "parameters": [
+            {
+              "name": "x",
+              "label": "流量",
+              "unit": "1",
+              "amount": 0.08,
+              "enabled": true,
+              "kind": "std",
+              "note": "合成假设"
+            }
+          ],
+          "seed": 3,
+          "posterior_function_samples": 32,
+          "mixture_samples": 512,
+          "realized_inputs": {
+            "x": {
+              "sample_mean": 0.9303657640569456,
+              "sample_std": 0.06462782904777208,
+              "min": 0.7286764917916131,
+              "max": 0.9999191002800222
+            }
+          }
+        }
+      }
+    ],
+    "fixed": {
+      "z": 0.3
+    },
+    "ranges": {
+      "x": [
+        0.0,
+        1.0
+      ]
+    },
+    "interval_kind": "latent_response_with_input_uncertainty",
+    "seed": 3,
+    "notices": [
+      "趋势图已包含所选输入的执行波动；输入确定时的对照结果保存在技术详情和导出表中。"
+    ]
+  },
+  "plot_path": "docs/evidence/input-uncertainty-2026-10-13/trend.png"
+}

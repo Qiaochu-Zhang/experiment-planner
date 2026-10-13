@@ -138,10 +138,9 @@ def _sample_summary(column, *, raw=False):
     }
 
 
-def prediction_summary(model, encoder, names, template, conditions, seed=0, samples=512):
-    with torch.random.fork_rng(), torch.no_grad():
-        torch.manual_seed(seed)
-        draws = model.posterior(encoder.encode(conditions)).rsample(torch.Size([samples]))
+def _summarize_draws(draws, names, template, conditions, seed):
+    samples = draws.shape[0]
+    with torch.no_grad():
         invalid = ~torch.isfinite(draws)
         if invalid.any():
             _, condition_index, response_index = invalid.nonzero()[0].tolist()
@@ -205,4 +204,45 @@ def prediction_summary(model, encoder, names, template, conditions, seed=0, samp
                 if expression is not None:
                     item["expression"] = expression
                 summary["objective_predictions"].append(item)
+        return summaries
+
+
+def prediction_summary(model, encoder, names, template, conditions, seed=0, samples=512):
+    from experiment_planner.domain.input_uncertainty import uncertainty_info
+    with torch.random.fork_rng(), torch.no_grad():
+        torch.manual_seed(seed)
+        X = encoder.encode(conditions)
+        draws = model.posterior(X).rsample(torch.Size([samples]))
+        nominal = _summarize_draws(draws, names, template, conditions, seed)
+        info = uncertainty_info(template)
+        if info is None:
+            return nominal
+        from experiment_planner.engine.input_uncertainty import InputDistribution
+        distribution = InputDistribution(template, encoder, seed)
+        expanded = distribution.expand(X)
+        # Each condition has a joint posterior over its perturbations. Batching
+        # conditions avoids a (conditions * perturbations)^2 covariance matrix.
+        summaries = []
+        per_input = max(1, (samples + distribution.n_w - 1) // distribution.n_w)
+        for offset in range(0, len(conditions), 16):
+            perturbed = expanded[offset:offset+16]
+            draws = model.posterior(perturbed).rsample(torch.Size([per_input]))
+            mixture = draws.permute(0, 2, 1, 3).reshape(-1, len(perturbed), len(names))
+            summaries.extend(_summarize_draws(mixture, names, template, conditions[offset:offset+16], seed))
+        for i, summary in enumerate(summaries):
+            for item in summary.values():
+                if isinstance(item, dict) and "quantiles" in item:
+                    item["interval_kind"] = "latent_response_with_input_uncertainty"
+                    item["source"] = "posterior_and_conditional_input_samples"
+            summary["nominal_prediction"] = nominal[i]
+            summary["input_uncertainty"] = {**info, "seed": seed,
+                "posterior_function_samples": per_input, "mixture_samples": per_input * distribution.n_w,
+                "realized_inputs": {}}
+            for field in distribution.fields:
+                lo, hi = field["bounds"]
+                values = lo + (hi-lo)*expanded[i, :, encoder.indices[field["name"]][0]]
+                summary["input_uncertainty"]["realized_inputs"][field["name"]] = {
+                    "sample_mean": values.mean().item(), "sample_std": values.std(unbiased=False).item(),
+                    "min": values.min().item(), "max": values.max().item(),
+                }
         return summaries
