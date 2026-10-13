@@ -179,6 +179,48 @@ def test_analysis_result_rendering_failure_has_diagnostics(window, monkeypatch):
     assert window.analyze_button.isEnabled() and window.analysis_task is None
 
 
+@pytest.mark.parametrize("all_undefined", [False, True])
+def test_prediction_with_undefined_ratio_finishes_and_preserves_usable_results(window, conditions, monkeypatch, all_undefined):
+    import torch
+    from experiment_planner.engine.models import Encoder
+    from experiment_planner.engine.objectives import prediction_summary
+
+    project = window.require_project()
+    template = project.template
+    metrics = template.metrics
+    for metric in metrics:
+        metric["display_digits"] = 2
+    template = template.revised(derived_metrics=metrics, ratio_policy={
+        **template.data["ratio_policy"], "mode": "valid_region", "epsilon_nm": 1.0})
+
+    class FixedPosterior:
+        def posterior(self, _): return self
+        def rsample(self, shape):
+            draws = [[2., 0.]] * 4 if all_undefined else [[2., 0.], [4., 2.], [6., 3.], [8., 4.]]
+            return torch.tensor(draws, dtype=torch.double).unsqueeze(1)
+
+    report = {"revision": project.revision, "conditions": [conditions], "predictions":
+              prediction_summary(FixedPosterior(), Encoder(template), ["sio2_loss_nm", "sin_loss_nm"],
+                                 template, [conditions], samples=4)}
+    before = project.snapshot()
+    failures = []
+    monkeypatch.setattr(window, "show_failure", lambda *args, **kwargs: failures.append(args))
+    window.analysis_template = template
+    window.analysis_task = CompletedTask({"result": report})
+    window.analyze_button.setEnabled(False)
+    window.analysis_timer.start()
+    window.poll_analysis()
+    assert not failures
+    text = window.analysis_output.toPlainText()
+    assert "SiO2" in text and "刻蚀量比值" in text
+    assert ("0/4" if all_undefined else "3/4") in text
+    assert ("不可用" if all_undefined else "有限样本中央 95% 区间") in text
+    assert window.analysis_report == report
+    assert window.analysis_task is None and window.analyze_button.isEnabled()
+    assert not window.analysis_timer.isActive()
+    assert project.snapshot() == before
+
+
 def test_recommendation_commit_failure_has_diagnostics(window, monkeypatch):
     def fail_commit(*args):
         raise RuntimeError("提交计算批次时失败")

@@ -1,0 +1,36 @@
+{
+  "data": "Synthetic posterior draws; no user data",
+  "before": {
+    "error": "ValidationError: 不能显示非法数值",
+    "objective_quantiles": "[2.075, 3.5, nan]"
+  },
+  "after": {
+    "objective": {
+      "mean": null,
+      "quantiles": [
+        2.05,
+        3.0,
+        3.95
+      ],
+      "sample_count": 4,
+      "finite_sample_count": 3,
+      "nonfinite_sample_count": 1,
+      "nonfinite_counts": {
+        "nan": 0,
+        "positive_infinity": 1,
+        "negative_infinity": 0
+      },
+      "summary_status": "partial",
+      "summary_notice": "有效有限样本 3/4，其余 1 个样本为非有限值。区间仅描述有限样本，不能视为完整预测分布的区间。请检查指标公式的分母、单位和数据尺度。",
+      "definition": {
+        "metric": "selectivity",
+        "transform": "identity",
+        "direction": "maximize"
+      },
+      "ratio_policy": "valid_region",
+      "notice": "原始比值不声明有限均值；可行性单独报告 有效有限样本 3/4，其余 1 个样本为非有限值。区间仅描述有限样本，不能视为完整预测分布的区间。请检查指标公式的分母、单位和数据尺度。",
+      "expression": "sio2_loss_nm / sin_loss_nm"
+    },
+    "display": "预测区间表示潜在响应，不包含额外的未来量测误差。\n\n条件 1\nSiO2刻蚀量：中位数 6.50，中央 95% 区间 [2.15, 15.47]\nSiN刻蚀量：中位数 2.50，中央 95% 区间 [0.15, 3.93]\n刻蚀量比值：中位数 3.00，有限样本中央 95% 区间 [2.05, 3.95]\n  刻蚀量比值提示：有效有限样本 3/4，其余 1 个样本为非有限值。区间仅描述有限样本，不能视为完整预测分布的区间。请检查指标公式的分母、单位和数据尺度。\n原始刻蚀量比值：中位数 3.00，有限样本中央 95% 区间 [2.05, 3.95]\n  原始刻蚀量比值提示：有效有限样本 3/4，其余 1 个样本为非有限值。区间仅描述有限样本，不能视为完整预测分布的区间。请检查指标公式的分母、单位和数据尺度。\n  SiO2刻蚀量：目标中位数 6.50，中央 95% 区间 [2.15, 15.47]\n  SiN刻蚀量：目标中位数 2.50，中央 95% 区间 [0.15, 3.93]\n  刻蚀量比值：目标中位数 3.00，有限样本中央 95% 区间 [2.05, 3.95]\n  刻蚀量比值提示：有效有限样本 3/4，其余 1 个样本为非有限值。区间仅描述有限样本，不能视为完整预测分布的区间。请检查指标公式的分母、单位和数据尺度。\n  预测可行概率：75.0%（不是预测准确率）"
+  }
+}

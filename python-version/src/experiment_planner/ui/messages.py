@@ -1,5 +1,6 @@
 """Chinese presentation; original diagnostics remain available for debugging."""
 import json
+import math
 import traceback
 
 from experiment_planner.precision.rounding import display
@@ -71,14 +72,33 @@ def formatted(value, name, template):
     return display(value, digits) if digits is not None else f"{value:.5g}"
 
 
+def _interval_lines(item, name, label, template, *, objective=False):
+    """An unavailable interval must not prevent other predictions being shown."""
+    prefix = f"  {label}：" if objective else f"{label}："
+    q = item.get("quantiles")
+    notice = item.get("summary_notice", "")
+    if q is None:
+        lines = [prefix + ("目标预测区间不可用" if objective else "预测区间不可用")]
+    elif (not isinstance(q, (list, tuple)) or len(q) != 3
+          or any(type(v) not in (int, float) or not math.isfinite(v) for v in q)):
+        # Older/cached reports can still contain invalid intervals. Keep their
+        # raw content in technical details, but never display it as a prediction.
+        lines = [prefix + "预测区间不可用：区间含非有限值或格式错误，请查看技术详情。"]
+    else:
+        q = [formatted(v, name, template) for v in q]
+        median = "目标中位数" if objective else "中位数"
+        interval = "有限样本中央 95% 区间" if item.get("nonfinite_sample_count", 0) else "中央 95% 区间"
+        lines = [f"{prefix}{median} {q[1]}，{interval} [{q[0]}, {q[2]}]"]
+    if notice:
+        lines.append(f"  {label}提示：{notice}")
+    return lines
+
+
 def prediction_lines(prediction, labels, template):
     lines = []
     for item in prediction.get("objective_predictions", []):
         name = item["definition"]["metric"]
-        q = item.get("quantiles")
-        if q:
-            q = [formatted(v, name, template) for v in q]
-            lines.append(f"  {labels.get(name, name)}：目标中位数 {q[1]}，中央 95% 区间 [{q[0]}, {q[2]}]")
+        lines.extend(_interval_lines(item, name, labels.get(name, name), template, objective=True))
     lines.append(f"  预测可行概率：{prediction.get('feasibility_probability', 1):.1%}（不是预测准确率）")
     return lines
 
@@ -89,10 +109,9 @@ def analysis_text(report, template):
     for i, prediction in enumerate(report["predictions"], 1):
         lines.append(f"\n条件 {i}")
         for name, item in prediction.items():
-            if not isinstance(item, dict) or not item.get("quantiles"): continue
-            q = [formatted(v, name, template) for v in item["quantiles"]]
+            if not isinstance(item, dict) or "quantiles" not in item: continue
             label = labels.get(name, {"raw_selectivity":"原始刻蚀量比值", "raw_selectivity_abs":"原始比值绝对值", "selectivity_stable":"稳定化比值"}.get(name,name))
-            lines.append(f"{label}：中位数 {q[1]}，中央 95% 区间 [{q[0]}, {q[2]}]")
+            lines.extend(_interval_lines(item, name, label, template))
         lines.extend(prediction_lines(prediction, labels, template))
     lines += ["\n提示：" + n for n in report.get("notices", [])]
     return "\n".join(lines)

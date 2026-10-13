@@ -302,6 +302,7 @@ def export_analysis(report, template, path):
                     **condition, "指标": name, "指标名称": field.get("label", name), "单位": field.get("unit", "1"),
                     "后验均值": item.get("mean"), "下限2.5%": q[0], "中位数50%": q[1], "上限97.5%": q[2],
                     "区间类型": item.get("interval_kind"), "预测可行概率": prediction.get("feasibility_probability"),
+                    "有限样本数": item.get("finite_sample_count"), "非有限样本数": item.get("nonfinite_sample_count"),
                     "说明": item.get("moment_notice", "")})
     if not rows: raise ValidationError("请先完成预测或趋势图计算")
     headers = list(rows[0])

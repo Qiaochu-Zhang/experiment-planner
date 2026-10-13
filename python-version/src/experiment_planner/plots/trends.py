@@ -72,9 +72,18 @@ def plot_slice(model,encoder,names,template,baseline,variables,metric,path,revis
     conditions=slice_conditions(template,baseline,variables,points,ranges)
     predictions=prediction_summary(model,encoder,names,template,conditions,seed=seed)
     if metric not in predictions[0]:raise ValidationError("该响应无法预测；剩余厚度预测需要初始条件及专门误差传播")
+    for i, prediction in enumerate(predictions):
+        item = prediction[metric]
+        q = item.get("quantiles")
+        if not q or not all(math.isfinite(value) for value in q):
+            error = ValidationError(f"趋势指标 {metric} 在条件 {i+1} 没有可用的有限分位数。"
+                                    + item.get("summary_notice", "请检查比值分母和模型数据。"))
+            error.add_note(f"绘图输入条件：{conditions[i]!r}\n指标统计：{item!r}")
+            raise error
+    partial = any(p[metric].get("nonfinite_sample_count", 0) for p in predictions)
+    notices = (["部分绘图点存在非有限样本；区间仅描述有限样本，不能视为完整预测分布的区间。"]
+               if partial else [])
     figure=Figure(figsize=(9,6),layout="constrained");ax=figure.subplots()
-    if any(not p[metric].get("quantiles") for p in predictions):
-        raise ValidationError("趋势指标没有可用的有限分位数，请检查比值分母和模型数据")
     quantiles=np.array([p[metric]["quantiles"] for p in predictions],dtype=float)
     font=FontProperties(fname=str(files("experiment_planner").joinpath("resources/fonts/NotoSansCJK-Regular.ttc")))
     labels={p["name"]:f"{p.get('label',p['name'])} ({p.get('unit','1')})" for p in template.fields}
@@ -82,7 +91,8 @@ def plot_slice(model,encoder,names,template,baseline,variables,metric,path,revis
     if len(variables)==1:
         x=[c[variables[0]] for c in conditions]
         ax.plot(x,quantiles[:,1],label="后验中位数")
-        ax.fill_between(x,quantiles[:,0],quantiles[:,2],alpha=.25,label="潜在响应中央 95% 区间")
+        ax.fill_between(x,quantiles[:,0],quantiles[:,2],alpha=.25,
+                        label="有限样本中央 95% 区间" if partial else "潜在响应中央 95% 区间")
         if ranges[variables[0]][0] <= baseline[variables[0]] <= ranges[variables[0]][1]:
             ax.axvline(baseline[variables[0]],ls="--",color="gray",label="基准输入")
         ax.set_ylabel(metric_label,fontproperties=font);ax.legend(prop=font)
@@ -97,6 +107,7 @@ def plot_slice(model,encoder,names,template,baseline,variables,metric,path,revis
     ax.set_xlabel(labels[variables[0]],fontproperties=font)
     fixed={k:v for k,v in baseline.items() if k not in variables}
     fixed_text="，".join(f"{labels.get(k,k)}={v:g}" if isinstance(v,(int,float)) else f"{labels.get(k,k)}={v}" for k,v in fixed.items())
-    figure.suptitle(f"模型预测切片 | 数据版本 {revision}\n固定条件：{fixed_text}",fontsize=9,fontproperties=font)
+    warning = "\n" + " ".join(notices) if notices else ""
+    figure.suptitle(f"模型预测切片 | 数据版本 {revision}\n固定条件：{fixed_text}{warning}",fontsize=9,fontproperties=font)
     figure.savefig(path,dpi=140)
-    return {"revision":revision,"template_version":template.data["template_version"],"conditions":conditions,"predictions":predictions,"fixed":fixed,"ranges":ranges,"interval_kind":"latent_response","seed":seed}
+    return {"revision":revision,"template_version":template.data["template_version"],"conditions":conditions,"predictions":predictions,"fixed":fixed,"ranges":ranges,"interval_kind":"latent_response","seed":seed,"notices":notices}

@@ -1,5 +1,23 @@
 # Python 源码版验证报告
 
+## 非有限预测区间显示与诊断 · 2026-10-13
+
+在本目录独立 Linux / Python 3.12 / Qt offscreen 环境完成 **143 项不同测试，0 失败、0 跳过**，包含 33 项新增回归：
+
+| 验证组 | 实际结果 |
+| --- | --- |
+| 非有限预测、预测正确性、目标策略、历史导出及趋势范围 | **91 passed**，17.23 秒，6 条既有依赖弃用与矩阵 jitter 警告 |
+| 失败诊断界面、精度与导出界面、绘图范围界面、后台失败/绘图、源码版入口、真实模型及时间响应 | **50 passed**，104.09 秒，10 条既有依赖弃用与矩阵 jitter 警告 |
+| 后补的有限样本均值/分位数溢出边界 | **2 passed**；仅运行这两个新增用例，不重复累计前述测试 |
+
+所有组均使用 `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest ... -q -p no:cacheprovider`。第一组文件：`test_prediction_nonfinite.py`、`test_prediction_validity.py`、`test_v02_strategy.py`、`test_history_exchange.py`、`test_trend_ranges.py`；第二组：`test_failure_diagnostics.py`、`test_history_export_ui.py`、`test_plot_ranges.py`、`test_worker_failures.py`、`test_worker_plots.py`、`test_python_edition.py`、`test_models.py`、`test_time_dependence.py`；最后一组使用 `test_prediction_nonfinite.py -k statistics_overflow`。测试进程均正常退出；未重跑整个仓库测试集。
+
+使用合成联合后验样本 `(SiO2, SiN) = (2,0), (4,2), (9,3), (16,4)`、有效区域策略及两位显示小数，直接加载修改前的汇总与显示代码复现：目标区间为 `[2.075, 3.5, NaN]`，显示抛出 `ValidationError: 不能显示非法数值`。修改后明确报告 3/4 有限样本，对有限比值 `[2,3,4]` 的分位数为 `[2.05,3,3.95]`，可行概率仍使用全部样本并保持 75%。[复现前后记录](evidence/prediction-nonfinite-2026-10-13/reproduction.json)。
+
+新增覆盖带符号/绝对值比值、四种比值策略、有无显示位数、部分及全部零分母、一般自定义公式、基础响应 `NaN` / 正负无穷大、旧报告非法区间、有限样本统计溢出、严格 JSON 序列化、CSV 说明、绘图失败定位和真实窗口完成回调。两种 GP 与贝叶斯线性模型的既有真实拟合/推荐/后台流程也通过。真实窗口测试确认分析没有改写实验数据，结束后按钮与计时器状态正常。
+
+已实际查看 [部分样本不可用的结果页](evidence/prediction-nonfinite-2026-10-13/partial-prediction.png)、[比值全部不可用的结果页](evidence/prediction-nonfinite-2026-10-13/unavailable-prediction.png)、[带有限样本警告的趋势图](evidence/prediction-nonfinite-2026-10-13/partial-trend.png)。截图与数值均为合成复现，没有用户原始实验数据；未做 Windows 实机验证，不能据此断定用户这一次的具体分母或指标。
+
 ## 基准误差与高可信实验的组合设置 · 2026-10-13
 
 在本目录独立环境 Linux / Python 3.12.3 / Qt offscreen 下完成 **271 项不同测试，0 失败、0 跳过**；两组进程退出码均为 0：

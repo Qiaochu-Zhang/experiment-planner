@@ -1,4 +1,5 @@
 import ast
+import math
 import torch
 from botorch.acquisition.multi_objective.objective import GenericMCMultiOutputObjective
 from botorch.acquisition.objective import GenericMCObjective
@@ -103,10 +104,56 @@ class Objectives:
         return GenericMCMultiOutputObjective(self.transformed) if self.template.data["optimization"]["mode"] == "pareto" else GenericMCObjective(self.scalar)
 
 
+def _sample_summary(column, *, raw=False):
+    """Report finite draws explicitly; never pass NaN/Inf into a saved interval."""
+    finite = column[torch.isfinite(column)]
+    total, count = column.numel(), finite.numel()
+    quantiles, mean = None, None
+    notices = []
+    if count != total:
+        notices.append(f"有效有限样本 {count}/{total}，其余 {total-count} 个样本为非有限值。"
+                       + ("区间仅描述有限样本，不能视为完整预测分布的区间。" if count else "没有可用的预测区间。")
+                       + "请检查指标公式的分母、单位和数据尺度。")
+    if count:
+        q = torch.quantile(finite, column.new_tensor([.025, .5, .975]))
+        if torch.isfinite(q).all():
+            quantiles = q.tolist()
+        else:
+            notices.append("有限样本的分位数计算发生数值溢出，区间不可用；请检查单位和数据尺度。")
+        if not raw and count == total:
+            candidate = finite.mean().item()
+            if math.isfinite(candidate):
+                mean = candidate
+            else:
+                notices.append("样本均值计算发生数值溢出，均值不可用；请检查单位和数据尺度。")
+    return {
+        "mean": mean, "quantiles": quantiles,
+        "sample_count": total, "finite_sample_count": count,
+        "nonfinite_sample_count": total-count,
+        "nonfinite_counts": {"nan": int(torch.isnan(column).sum()),
+                             "positive_infinity": int(torch.isposinf(column).sum()),
+                             "negative_infinity": int(torch.isneginf(column).sum())},
+        "summary_status": "unavailable" if quantiles is None else "partial" if notices else "ok",
+        "summary_notice": " ".join(notices),
+    }
+
+
 def prediction_summary(model, encoder, names, template, conditions, seed=0, samples=512):
     with torch.random.fork_rng(), torch.no_grad():
         torch.manual_seed(seed)
         draws = model.posterior(encoder.encode(conditions)).rsample(torch.Size([samples]))
+        invalid = ~torch.isfinite(draws)
+        if invalid.any():
+            _, condition_index, response_index = invalid.nonzero()[0].tolist()
+            name = names[response_index]
+            field = next(f for f in template.fields if f["name"] == name)
+            count = int(invalid[:, condition_index, response_index].sum())
+            error = ValidationError(
+                f"预测失败：条件 {condition_index+1} 的基础响应 {field.get('label', name)}（{name}）"
+                f"产生 {count}/{samples} 个非有限后验样本，不能作为有效预测。")
+            error.add_note(f"预测输入条件：{conditions[condition_index]!r}\n"
+                           f"响应：{name}；随机种子：{seed}；请检查模型数值稳定性、响应单位和数据尺度。")
+            raise error
         objectives = Objectives(template, names)
         values = objectives.values(draws)
         # Raw ratio is always a separate record with quantiles, never finite moments.
@@ -124,9 +171,16 @@ def prediction_summary(model, encoder, names, template, conditions, seed=0, samp
         for name, array in values.items():
             for i in range(len(conditions)):
                 column = array[:, i]
-                finite = column[torch.isfinite(column)]
                 raw = name in (raw_name,objectives.policy.get("original_metric")) or template.graph.metrics.get(name, {}).get("undefined_policy") == "ratio_policy"
-                summaries[i][name] = {"mean": None if raw or len(finite) != samples else finite.mean().item(), "quantiles": torch.quantile(finite, torch.tensor([.025, .5, .975], dtype=draws.dtype)).tolist() if len(finite) else None, "interval_kind": "latent_response", "source": "joint_posterior_samples", "moment_notice": "原始比值仅报告有限样本分位数；不声明均值/方差存在" if raw else ""}
+                item = _sample_summary(column, raw=raw)
+                item.update(interval_kind="latent_response", source="joint_posterior_samples",
+                            moment_notice=" ".join(filter(None, [
+                                "原始比值仅报告有限样本分位数；不声明均值/方差存在" if raw else "",
+                                item["summary_notice"]])))
+                expression = template.graph.metrics.get(name, {}).get("expression")
+                if expression is not None:
+                    item["expression"] = expression
+                summaries[i][name] = item
         constraints = objectives.constraints()
         feasible = torch.ones(draws.shape[:-1], dtype=torch.bool)
         for constraint in constraints: feasible &= constraint(draws) <= 0
@@ -142,5 +196,13 @@ def prediction_summary(model, encoder, names, template, conditions, seed=0, samp
             for j,objective in enumerate(objectives.objectives):
                 column=transformed[:,i,j] * (1 if objective["direction"]=="maximize" else -1)
                 is_raw=objective["metric"]==objectives.policy.get("original_metric") and objectives.policy["mode"]!="stabilized"
-                summary["objective_predictions"].append({"definition":objective,"ratio_policy":objectives.policy["mode"],"mean":None if is_raw else column.mean().item(),"quantiles":torch.quantile(column,torch.tensor([.025,.5,.975],dtype=draws.dtype)).tolist(),"notice":"有效区域策略的原始比值不声明有限均值；可行性单独报告" if is_raw else ""})
+                item = _sample_summary(column, raw=is_raw)
+                item.update(definition=objective, ratio_policy=objectives.policy["mode"],
+                            notice=" ".join(filter(None, [
+                                "原始比值不声明有限均值；可行性单独报告" if is_raw else "",
+                                item["summary_notice"]])))
+                expression = template.graph.metrics.get(objective["metric"], {}).get("expression")
+                if expression is not None:
+                    item["expression"] = expression
+                summary["objective_predictions"].append(item)
         return summaries
