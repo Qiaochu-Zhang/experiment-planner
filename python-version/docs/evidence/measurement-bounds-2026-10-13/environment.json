@@ -1,0 +1,13 @@
+{
+  "python": "3.12.3",
+  "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+  "qt_platform": "offscreen",
+  "versions": {
+    "torch": "2.8.0+cpu",
+    "botorch": "0.18.1",
+    "gpytorch": "1.15.2",
+    "PySide6": "6.12.0",
+    "pytest": "9.1.1"
+  },
+  "data": "synthetic only"
+}

@@ -1,0 +1,294 @@
+[
+  {
+    "id": 1,
+    "actual": {
+      "ar_sccm": 50.0,
+      "bcl3_sccm": 50.0,
+      "cl2_sccm": 50.0,
+      "electrode_temp_c": 20.0,
+      "etch_time_s": 155.0,
+      "icp_w": 800.0,
+      "pressure_mt": 27.5,
+      "rf_w": 50.0
+    },
+    "derived": {
+      "selectivity": {
+        "formula_version": 2,
+        "reason": "分母为零或其测量区间跨零；保留有效 A、B",
+        "sources": [
+          "sin_loss_nm",
+          "sio2_loss_nm"
+        ],
+        "status": "unstable",
+        "uncertainty": {
+          "assumption": "independent_except_shared_sources",
+          "interval": [
+            -115.22642019039806,
+            114.2173703659489
+          ],
+          "method": "joint_monte_carlo",
+          "moment_notice": "原始比值仅给样本分位数，不声明均值或方差存在",
+          "samples": 4096,
+          "seed": 0,
+          "standard": null
+        },
+        "value": 10.0
+      },
+      "sin_loss_nm": {
+        "formula_version": 2,
+        "reason": "",
+        "sources": [
+          "sin_initial_nm",
+          "sin_remaining_nm"
+        ],
+        "status": "valid",
+        "uncertainty": {
+          "assumption": "independent",
+          "interval": [
+            -0.6003332986183432,
+            2.6003332986183434
+          ],
+          "method": "exact_covariance",
+          "standard": 0.8164965809277261,
+          "value": 1.0
+        },
+        "value": 1.0
+      },
+      "sio2_loss_nm": {
+        "formula_version": 2,
+        "reason": "",
+        "sources": [
+          "sio2_initial_nm",
+          "sio2_remaining_nm"
+        ],
+        "status": "valid",
+        "uncertainty": {
+          "assumption": "independent",
+          "interval": [
+            8.399666701381657,
+            11.600333298618343
+          ],
+          "method": "exact_covariance",
+          "standard": 0.8164965809277261,
+          "value": 10.0
+        },
+        "value": 10.0
+      }
+    },
+    "field_notes": {},
+    "note": "",
+    "observations": {
+      "sin_initial_nm": {
+        "note": "误差设定假设：高可信 界限 ±1（均匀分布，换算 1σ=0.57735） nm（基准 2 × 0.5）；仅演示：假设误差界限为 ±2 nm",
+        "uncertainty": {
+          "amount": 1.0,
+          "confidence": null,
+          "coverage_factor": null,
+          "distribution": "uniform",
+          "kind": "bounds",
+          "lower": null,
+          "source": null,
+          "upper": null
+        },
+        "unit": "nm",
+        "value": 100.0
+      },
+      "sin_remaining_nm": {
+        "note": "误差设定假设：高可信 界限 ±1（均匀分布，换算 1σ=0.57735） nm（基准 2 × 0.5）；仅演示：假设误差界限为 ±2 nm",
+        "uncertainty": {
+          "amount": 1.0,
+          "confidence": null,
+          "coverage_factor": null,
+          "distribution": "uniform",
+          "kind": "bounds",
+          "lower": null,
+          "source": null,
+          "upper": null
+        },
+        "unit": "nm",
+        "value": 99.0
+      },
+      "sio2_initial_nm": {
+        "note": "误差设定假设：高可信 界限 ±1（均匀分布，换算 1σ=0.57735） nm（基准 2 × 0.5）；仅演示：假设误差界限为 ±2 nm",
+        "uncertainty": {
+          "amount": 1.0,
+          "confidence": null,
+          "coverage_factor": null,
+          "distribution": "uniform",
+          "kind": "bounds",
+          "lower": null,
+          "source": null,
+          "upper": null
+        },
+        "unit": "nm",
+        "value": 100.0
+      },
+      "sio2_remaining_nm": {
+        "note": "误差设定假设：高可信 界限 ±1（均匀分布，换算 1σ=0.57735） nm（基准 2 × 0.5）；仅演示：假设误差界限为 ±2 nm",
+        "uncertainty": {
+          "amount": 1.0,
+          "confidence": null,
+          "coverage_factor": null,
+          "distribution": "uniform",
+          "kind": "bounds",
+          "lower": null,
+          "source": null,
+          "upper": null
+        },
+        "unit": "nm",
+        "value": 90.0
+      }
+    },
+    "record_uid": "032cadce-2643-4522-806c-5dfdcd6d8474",
+    "status": "completed",
+    "suggested": null,
+    "template_version": 2,
+    "updated": "2026-10-13T08:42:12.734686+00:00"
+  },
+  {
+    "id": 2,
+    "actual": {
+      "ar_sccm": 50.0,
+      "bcl3_sccm": 50.0,
+      "cl2_sccm": 50.0,
+      "electrode_temp_c": 20.0,
+      "etch_time_s": 155.0,
+      "icp_w": 800.0,
+      "pressure_mt": 27.5,
+      "rf_w": 50.0
+    },
+    "derived": {
+      "selectivity": {
+        "formula_version": 2,
+        "reason": "分母为零或其测量区间跨零；保留有效 A、B",
+        "sources": [
+          "sin_loss_nm",
+          "sio2_loss_nm"
+        ],
+        "status": "unstable",
+        "uncertainty": {
+          "assumption": "independent_except_shared_sources",
+          "interval": [
+            -63.99276099699824,
+            71.51257092815749
+          ],
+          "method": "joint_monte_carlo",
+          "moment_notice": "原始比值仅给样本分位数，不声明均值或方差存在",
+          "samples": 4096,
+          "seed": 0,
+          "standard": null
+        },
+        "value": 10.0
+      },
+      "sin_loss_nm": {
+        "formula_version": 2,
+        "reason": "",
+        "sources": [
+          "sin_initial_nm",
+          "sin_remaining_nm"
+        ],
+        "status": "valid",
+        "uncertainty": {
+          "assumption": "independent",
+          "interval": [
+            -2.2006665972366863,
+            4.200666597236687
+          ],
+          "method": "exact_covariance",
+          "standard": 1.6329931618554523,
+          "value": 1.0
+        },
+        "value": 1.0
+      },
+      "sio2_loss_nm": {
+        "formula_version": 2,
+        "reason": "",
+        "sources": [
+          "sio2_initial_nm",
+          "sio2_remaining_nm"
+        ],
+        "status": "valid",
+        "uncertainty": {
+          "assumption": "independent",
+          "interval": [
+            6.799333402763313,
+            13.200666597236687
+          ],
+          "method": "exact_covariance",
+          "standard": 1.6329931618554523,
+          "value": 10.0
+        },
+        "value": 10.0
+      }
+    },
+    "field_notes": {},
+    "note": "",
+    "observations": {
+      "sin_initial_nm": {
+        "note": "误差设定假设：基准 界限 ±2（均匀分布，换算 1σ=1.1547） nm；仅演示：假设误差界限为 ±2 nm",
+        "uncertainty": {
+          "amount": 2.0,
+          "confidence": null,
+          "coverage_factor": null,
+          "distribution": "uniform",
+          "kind": "bounds",
+          "lower": null,
+          "source": null,
+          "upper": null
+        },
+        "unit": "nm",
+        "value": 100.0
+      },
+      "sin_remaining_nm": {
+        "note": "误差设定假设：基准 界限 ±2（均匀分布，换算 1σ=1.1547） nm；仅演示：假设误差界限为 ±2 nm",
+        "uncertainty": {
+          "amount": 2.0,
+          "confidence": null,
+          "coverage_factor": null,
+          "distribution": "uniform",
+          "kind": "bounds",
+          "lower": null,
+          "source": null,
+          "upper": null
+        },
+        "unit": "nm",
+        "value": 99.0
+      },
+      "sio2_initial_nm": {
+        "note": "误差设定假设：基准 界限 ±2（均匀分布，换算 1σ=1.1547） nm；仅演示：假设误差界限为 ±2 nm",
+        "uncertainty": {
+          "amount": 2.0,
+          "confidence": null,
+          "coverage_factor": null,
+          "distribution": "uniform",
+          "kind": "bounds",
+          "lower": null,
+          "source": null,
+          "upper": null
+        },
+        "unit": "nm",
+        "value": 100.0
+      },
+      "sio2_remaining_nm": {
+        "note": "误差设定假设：基准 界限 ±2（均匀分布，换算 1σ=1.1547） nm；仅演示：假设误差界限为 ±2 nm",
+        "uncertainty": {
+          "amount": 2.0,
+          "confidence": null,
+          "coverage_factor": null,
+          "distribution": "uniform",
+          "kind": "bounds",
+          "lower": null,
+          "source": null,
+          "upper": null
+        },
+        "unit": "nm",
+        "value": 90.0
+      }
+    },
+    "record_uid": "575fcd72-b2e7-4105-a27e-9044959d1ac3",
+    "status": "completed",
+    "suggested": null,
+    "template_version": 2,
+    "updated": "2026-10-13T08:42:12.799525+00:00"
+  }
+]

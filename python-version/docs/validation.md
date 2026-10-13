@@ -1,5 +1,17 @@
 # Python 源码版验证报告
 
+## 统一设置测量误差支持界限 · 2026-10-13
+
+在本目录 Linux / Python 3.12 / Qt offscreen 环境完成 **116 项不同测试**，最终均有通过结果，其中新增界限覆盖 **31 项**。首次运行 `test_uncertainty.py`、`test_measurement_uncertainty.py`（集成与 GUI）、`test_history_exchange.py`、`test_storage.py`、`test_models.py` 共 115 项，结果 **114 passed、1 failed**，47.55 秒：[日志](evidence/measurement-bounds-2026-10-13/tests.txt)、[JUnit](evidence/measurement-bounds-2026-10-13/tests.xml)。
+
+唯一失败是新增导入往返测试把既有导入流程附加的 `source_text` 元数据当成差异；修正为核对原有测量全部字段并确认原始文本元数据存在。随后复查该项和通用帮助检查，**2 passed**，4.26 秒：[日志](evidence/measurement-bounds-2026-10-13/recheck.txt)、[JUnit](evidence/measurement-bounds-2026-10-13/recheck.xml)。重复用例不重复计数，首次运行记录保留。9 条警告均为已有依赖弃用及矩阵 jitter 提示。
+
+新增验证涵盖界限选择、默认 1σ 兼容、非法数值拒绝且不改数据、实际窗口应用/取消/撤销、界限及分布类型保存、派生响应误差重算、项目显式保存与重开、CSV/Excel 往返、高可信模式跨误差类型比较及共享来源保留。GP/RBF、GP/Matérn 和贝叶斯线性均验证：同一数据填界限 `a` 与填等效标准差 `a/√3` 的后验均值/方差一致，训练不修改所填界限。
+
+已查看 [界限设置与逐项预览](evidence/measurement-bounds-2026-10-13/bounds-dialog.png)、[150% 字体下的设置](evidence/measurement-bounds-2026-10-13/bounds-font150.png)，保存按钮与汇总仍可见，内容可滚动。[高可信界限模式](evidence/measurement-bounds-2026-10-13/relative-bounds-dialog.png)、[保存后的合成记录](evidence/measurement-bounds-2026-10-13/saved-uncertainties.json)、[环境](evidence/measurement-bounds-2026-10-13/environment.json) 同目录保留。测试均使用 `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest ... -q -p no:cacheprovider`。
+
+本次修改原有统一设置入口，不改变 GP 似然或预测约束。界限转换依赖明确的均匀分布假设；真实误差上界、仪器校准与 Windows 实机未在本次合成验证中确认。
+
 ## 可选输入不确定度 · 2026-10-13
 
 本目录 Linux / Python 3.12 / Qt offscreen 环境验证 **363 项不同测试**：59 项单元、256 项集成、48 项相关界面测试。包括本次新增的 **47 项**（38 项计算/集成、9 项界面）。

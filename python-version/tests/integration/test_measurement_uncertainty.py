@@ -83,11 +83,12 @@ def test_overwrite_converts_interval_and_preserves_correlation(service, conditio
 
 
 @pytest.mark.parametrize("amount", [0, -1, float("nan"), float("inf"), 1e200, 1e-200, True, ".5", None])
-def test_invalid_amount_never_mutates_records_or_audit(service, conditions, measurements, amount):
+@pytest.mark.parametrize("kind", ["std", "bounds"])
+def test_invalid_amount_never_mutates_records_or_audit(service, conditions, measurements, amount, kind):
     eid = service.add_record(conditions, measurements)
     before = service.project.snapshot(), service.project.history()
     with pytest.raises(ValidationError):
-        service.set_measurement_uncertainty([eid], SIO2, amount)
+        service.set_measurement_uncertainty([eid], SIO2, amount, kind=kind)
     assert (service.project.snapshot(), service.project.history()) == before
 
 
@@ -249,3 +250,92 @@ def test_select_measurements_for_nested_response_and_custom_names(template):
     data = template.data
     data["derived_metrics"].append({"name": "twice_loss", "expression": "sio2_loss_nm * 2", "unit": "nm"})
     assert raw_measurement_names(Template(data), "twice_loss") == set(SIO2)
+
+
+def test_bounds_preserve_semantics_recompute_and_roundtrip_with_undo(service, conditions, measurements, tmp_path):
+    from experiment_planner.io.exchange import export_records, preview_import
+    p = service.project
+    eid = service.add_record(conditions, measurements)
+    original = p.experiments()
+    with ProjectSession(p.path) as session:
+        editor = PlannerService(session)
+        editor.set_measurement_uncertainty([eid], SIO2, 2., kind="bounds", reason="设备指标的对称界限")
+        changed = session.experiments()
+        for name in SIO2:
+            cell = changed[0]["observations"][name]
+            assert cell["value"] == measurements[name]
+            assert cell["uncertainty"]["kind"] == "bounds"
+            assert cell["uncertainty"]["distribution"] == "uniform"
+            assert cell["uncertainty"]["amount"] == 2.
+            assert "界限 ±2" in cell["note"] and "均匀分布" in cell["note"]
+        assert changed[0]["derived"]["sio2_loss_nm"]["uncertainty"]["standard"] == pytest.approx(math.sqrt(8/3))
+        assert changed[0]["actual"] == original[0]["actual"]
+        editor.undo(); assert session.experiments() == original
+        editor.redo(); assert session.experiments() == changed
+        revision = session.revision
+        assert editor.set_measurement_uncertainty([eid], SIO2, 2., kind="bounds")["changed_cells"] == 0
+        assert session.revision == revision
+        session.save()
+    with Project(p.path) as reopened:
+        assert reopened.experiments() == changed
+        for extension in ("csv", "xlsx"):
+            path = tmp_path / f"bounds.{extension}"
+            export_records(reopened, path)
+            with Project.create(tmp_path / f"import-{extension}.sqlite", "界限导入", reopened.template) as target:
+                importer = PlannerService(target)
+                preview = preview_import(importer, path)
+                assert not preview.errors
+                [imported_id] = preview.commit(importer)
+                imported = target.experiment(imported_id)["observations"]
+                # Imports additionally preserve the original spreadsheet text.
+                for name, prior in changed[0]["observations"].items():
+                    assert {key: imported[name][key] for key in prior} == prior
+                    assert "source_text" in imported[name]
+
+
+def test_relative_bounds_compare_standard_scales_and_keep_sources(service, conditions):
+    ids = [service.add_record(conditions, {SIO2[0]: {"value": 100.,
+           "uncertainty": {"kind": "std", "amount": amount, "source": f"source-{i}"}}}, status="partial")
+           for i, amount in enumerate((.8, .4))]
+    ids.append(service.add_record(conditions, {SIO2[0]: 100.}, status="partial"))
+    result = service.set_measurement_uncertainty(ids, SIO2, 2., kind="bounds", only_unknown=True,
+        trusted_experiment_ids=ids[:2], trusted_factor=.5)
+    assert result["changed_cells"] == 2 and result["skipped_known"] == 1 and result["skipped_missing"] == 3
+    records = service.project.experiments()
+    first = records[0]["observations"][SIO2[0]]["uncertainty"]
+    assert first["kind"] == "bounds" and first["amount"] == 1. and first["source"] == "source-0"
+    assert records[1]["observations"][SIO2[0]]["uncertainty"]["kind"] == "std"
+    assert records[2]["observations"][SIO2[0]]["uncertainty"]["amount"] == 2.
+    # The old .8 sigma must shrink to 1/sqrt(3), even though .8 < raw bound 1.
+    assert "基准 2 × 0.5" in records[0]["observations"][SIO2[0]]["note"]
+
+
+@pytest.mark.parametrize("kind", ["interval", "asymmetric", "uniform", None])
+def test_bulk_unsupported_kind_is_atomic(service, conditions, measurements, kind):
+    eid = service.add_record(conditions, measurements)
+    before = service.project.snapshot(), service.project.history()
+    with pytest.raises(ValidationError, match="请选择"):
+        service.set_measurement_uncertainty([eid], SIO2, 2., kind=kind)
+    assert (service.project.snapshot(), service.project.history()) == before
+
+
+@pytest.mark.parametrize("preset", ["gp_rbf_v1", "gp_matern25_v1", "bayesian_linear_v1"])
+def test_bounds_model_matches_equivalent_standard_uncertainty(tmp_path, preset):
+    template = Template({"schema_version": 2, "template_version": 1, "name": "合成界限验证",
+        "parameters": [{"name": "x", "unit": "1", "bounds": [0, 1]}],
+        "measurements": [{"name": "y", "unit": "nm", "is_response": True}],
+        "derived_metrics": [], "objectives": [{"metric": "y", "direction": "maximize"}],
+        "optimization": {"mode": "single"}, "ratio_policy": {"mode": "remove"}})
+    with Project.create(tmp_path/"equivalent.sqlite", "合成界限验证", template) as p:
+        service = PlannerService(p)
+        ids = [service.add_record({"x": x}, {"y": y}) for x, y in [(0., 0.), (.5, 3.), (1., 2.)]]
+        service.set_measurement_uncertainty(ids, ["y"], 2., kind="bounds")
+        model, encoder, _, _, _ = fit_models(template, p.experiments(), preset, seed=2)
+        X = encoder.encode([{"x": .25}, {"x": .5}])
+        first = model.posterior(X)
+        assert all(r["observations"]["y"]["uncertainty"]["amount"] == 2. for r in p.experiments())
+        service.set_measurement_uncertainty(ids, ["y"], 2/math.sqrt(3))
+        equivalent, _, _, _, _ = fit_models(template, p.experiments(), preset, seed=2)
+        second = equivalent.posterior(X)
+        torch.testing.assert_close(first.mean, second.mean)
+        torch.testing.assert_close(first.variance, second.variance)

@@ -4,7 +4,7 @@ import uuid
 from functools import wraps
 
 from experiment_planner.application.records import derive, normalize_observations
-from experiment_planner.application.measurement_uncertainty import plan_standard_uncertainty
+from experiment_planner.application.measurement_uncertainty import plan_measurement_uncertainty
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.storage.project import Project, encode, now
 
@@ -106,7 +106,7 @@ class PlannerService:
 
     @reversible
     def set_measurement_uncertainty(self, experiment_ids, measurement_names, amount, *,
-                                    only_unknown=False, expected_revision=None,
+                                    kind="std", only_unknown=False, expected_revision=None,
                                     trusted_experiment_ids=(), trusted_factor=None, reason=""):
         """Apply one reversible, audited bulk edit to existing measured cells."""
         ids = list(experiment_ids)
@@ -116,8 +116,8 @@ class PlannerService:
         p = self.project
         with p.transaction(self._action_revision if expected_revision is None else expected_revision):
             template = p.template
-            plan = plan_standard_uncertainty(template, [p.experiment(eid) for eid in ids],
-                                             measurement_names, amount, only_unknown=only_unknown,
+            plan = plan_measurement_uncertainty(template, [p.experiment(eid) for eid in ids],
+                                             measurement_names, amount, kind=kind, only_unknown=only_unknown,
                                              trusted_experiment_ids=trusted_experiment_ids,
                                              trusted_factor=trusted_factor, reason=reason)
             for _, new in plan.changes:

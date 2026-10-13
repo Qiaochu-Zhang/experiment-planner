@@ -14,12 +14,14 @@ pytestmark = pytest.mark.gui
 
 
 @pytest.mark.parametrize("amount", ["", "abc", "0", "-1", "nan", "inf", "1e200", "1e-200"])
-def test_invalid_amount_disables_apply(qt_application, service, conditions, measurements, amount):
+@pytest.mark.parametrize("kind", ["std", "bounds"])
+def test_invalid_amount_disables_apply(qt_application, service, conditions, measurements, amount, kind):
     service.add_record(conditions, measurements)
     dialog = MeasurementUncertaintyDialog(service.project.template, service.project.experiments())
+    dialog.kind.setCurrentIndex(dialog.kind.findData(kind))
     dialog.amount.setText(amount)
     assert not dialog.apply_button.isEnabled()
-    assert "1σ" in dialog.preview.text()
+    assert ("界限" if kind == "bounds" else "1σ") in dialog.preview.text()
     dialog.close()
 
 
@@ -56,7 +58,8 @@ def test_numeric_fields_units_and_empty_project(qt_application, template):
 
 
 @pytest.mark.parametrize("scope,accept", [("selected", True), ("all", True), ("all", False)])
-def test_real_button_dialog_apply_cancel_and_undo(qt_application, tmp_path, conditions, measurements, scope, accept):
+@pytest.mark.parametrize("kind", ["std", "bounds"])
+def test_real_button_dialog_apply_cancel_and_undo(qt_application, tmp_path, conditions, measurements, scope, accept, kind):
     window = PythonWindow()
     window.set_project(Project.create(tmp_path / "bulk.sqlite", "统一误差测试"))
     for _ in range(2): window.service.add_record(conditions, measurements)
@@ -72,6 +75,7 @@ def test_real_button_dialog_apply_cancel_and_undo(qt_application, tmp_path, cond
             dialog.reject(); return
         inspected.append(dialog.apply_button.text())
         dialog.scope.setCurrentIndex(dialog.scope.findData(scope))
+        dialog.kind.setCurrentIndex(dialog.kind.findData(kind))
         dialog.amount.setText(".5")
         target = dialog.apply_button if accept else dialog.buttons.button(QDialogButtonBox.StandardButton.Cancel)
         QTest.mouseClick(target, Qt.MouseButton.LeftButton)
@@ -80,6 +84,8 @@ def test_real_button_dialog_apply_cancel_and_undo(qt_application, tmp_path, cond
     assert inspected == [True, "应用设置"]
     assert p.revision == revision + int(accept)
     if accept:
+        assert p.experiment(1)["observations"]["sio2_initial_nm"]["uncertainty"]["kind"] == kind
+        assert p.experiment(1)["observations"]["sio2_initial_nm"]["uncertainty"]["distribution"] == ("uniform" if kind == "bounds" else None)
         assert p.experiment(1)["observations"]["sio2_initial_nm"]["uncertainty"]["amount"] == .5
         assert p.experiment(2)["observations"]["sio2_initial_nm"]["uncertainty"]["amount"] == (.5 if scope == "all" else None)
         assert "已更新" in window.statusBar().currentMessage()
@@ -114,6 +120,43 @@ def test_relative_mode_selects_all_targets_and_previews_values_and_reason(qt_app
     assert not dialog.apply_button.isEnabled() and "高可信实验" in dialog.preview.text()
     dialog.mode.setCurrentIndex(0)
     assert dialog.scope.isEnabled() and dialog.values()["trusted_factor"] is None
+    dialog.close()
+
+
+def test_bounds_preview_type_switch_and_relative_labels(qt_application, service, conditions, measurements):
+    eid = service.add_record(conditions, measurements)
+    dialog = MeasurementUncertaintyDialog(service.project.template, service.project.experiments(), [eid])
+    assert dialog.kind.currentData() == "std"
+    dialog.kind.setCurrentIndex(dialog.kind.findData("bounds")); dialog.amount.setText("2")
+    assert dialog.values()["kind"] == "bounds" and dialog.values()["amount"] == 2.
+    assert "半宽 a" in dialog.amount_label.text() and "均匀分布" in dialog.kind_hint.text()
+    assert "±2" in dialog.preview.text() and "1.1547" in dialog.preview.text()
+    assert "±2" in dialog.details.item(0, 4).text()
+    dialog.mode.setCurrentIndex(dialog.mode.findData("relative"))
+    dialog.factor.setValue(.5)
+    assert "基准界限" in dialog.factor_label.text() and "= 1" in dialog.trusted_hint.text()
+    assert "±1" in dialog.details.item(0, 4).text()
+    dialog.kind.setCurrentIndex(dialog.kind.findData("std"))
+    assert dialog.amount.text() == "2" and "1σ" in dialog.amount_label.text()
+    assert dialog.details.item(0, 4).text() == "1"
+    dialog.close()
+
+
+def test_read_common_bound_never_infers_it_from_sigma(qt_application, service, conditions, measurements):
+    eid = service.add_record(conditions, measurements)
+    names = [f["name"] for f in service.project.template.measurements]
+    service.set_measurement_uncertainty([eid], names, .3)
+    dialog = MeasurementUncertaintyDialog(service.project.template, service.project.experiments())
+    dialog.kind.setCurrentIndex(dialog.kind.findData("bounds"))
+    dialog.load_current_amount()
+    assert dialog.amount.text() == "" and "不会由 1σ 反推" in dialog.read_feedback.text()
+    service.set_measurement_uncertainty([eid], names, 2., kind="bounds")
+    dialog.records = service.project.experiments()
+    dialog.load_current_amount()
+    assert dialog.amount.text() == "2.0" and not dialog.apply_button.isEnabled()
+    dialog.kind.setCurrentIndex(dialog.kind.findData("std"))
+    dialog.load_current_amount()
+    assert float(dialog.amount.text()) == pytest.approx(2/3**.5)
     dialog.close()
 
 

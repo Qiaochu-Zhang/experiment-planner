@@ -1,0 +1,77 @@
+.............................................F.......................... [ 62%]
+...........................................                              [100%]
+=================================== FAILURES ===================================
+_______ test_bounds_preserve_semantics_recompute_and_roundtrip_with_undo _______
+
+service = <experiment_planner.application.service.PlannerService object at 0x75ee9516dcd0>
+conditions = {'cl2_sccm': 50.0, 'bcl3_sccm': 50.0, 'ar_sccm': 50.0, 'icp_w': 800.0, ...}
+measurements = {'sio2_initial_nm': 100.0, 'sio2_remaining_nm': 90.0, 'sin_initial_nm': 100.0, 'sin_remaining_nm': 99.0}
+tmp_path = PosixPath('/tmp/pytest-of-ubuntu/pytest-32/test_bounds_preserve_semantics0')
+
+    def test_bounds_preserve_semantics_recompute_and_roundtrip_with_undo(service, conditions, measurements, tmp_path):
+        from experiment_planner.io.exchange import export_records, preview_import
+        p = service.project
+        eid = service.add_record(conditions, measurements)
+        original = p.experiments()
+        with ProjectSession(p.path) as session:
+            editor = PlannerService(session)
+            editor.set_measurement_uncertainty([eid], SIO2, 2., kind="bounds", reason="设备指标的对称界限")
+            changed = session.experiments()
+            for name in SIO2:
+                cell = changed[0]["observations"][name]
+                assert cell["value"] == measurements[name]
+                assert cell["uncertainty"]["kind"] == "bounds"
+                assert cell["uncertainty"]["distribution"] == "uniform"
+                assert cell["uncertainty"]["amount"] == 2.
+                assert "界限 ±2" in cell["note"] and "均匀分布" in cell["note"]
+            assert changed[0]["derived"]["sio2_loss_nm"]["uncertainty"]["standard"] == pytest.approx(math.sqrt(8/3))
+            assert changed[0]["actual"] == original[0]["actual"]
+            editor.undo(); assert session.experiments() == original
+            editor.redo(); assert session.experiments() == changed
+            revision = session.revision
+            assert editor.set_measurement_uncertainty([eid], SIO2, 2., kind="bounds")["changed_cells"] == 0
+            assert session.revision == revision
+            session.save()
+        with Project(p.path) as reopened:
+            assert reopened.experiments() == changed
+            for extension in ("csv", "xlsx"):
+                path = tmp_path / f"bounds.{extension}"
+                export_records(reopened, path)
+                with Project.create(tmp_path / f"import-{extension}.sqlite", "界限导入", reopened.template) as target:
+                    importer = PlannerService(target)
+                    preview = preview_import(importer, path)
+                    assert not preview.errors
+                    [imported_id] = preview.commit(importer)
+>                   assert target.experiment(imported_id)["observations"] == changed[0]["observations"]
+E                   AssertionError: assert {'sin_initial...': 'nm', ...}} == {'sin_initial...value': 90.0}}
+E
+E                     Differing items:
+E                     {'sio2_initial_nm': {'note': '误差设定假设：统一 界限 ±2（均匀分布，换算 1σ=1.1547） nm；设备指标的对称界限', 'source_text': '100.0', 'uncertainty': {'amount': 2.0, 'confidence': None, 'coverage_factor': None, 'distribution': 'uniform', ...}, 'unit': 'nm', ...}} != {'sio2_initial_nm': {'note': '误差设定假设：统一 界限 ±2（均匀分布，换算 1σ=1.1547） nm；设备指标的对称界限', 'uncertainty': {'amount': 2.0, 'confidence': None, 'coverage_factor': None, 'distribution': 'uniform', ...}, 'unit': 'nm', 'value': 100.0}}
+E                     {'sin_initial_nm': {'note': '', 'source_text': '100.0', 'uncertainty': {'amount': None, 'confidence': Non...
+E
+E                     ...Full output truncated (4 lines hidden), use '-vv' to show
+
+tests/integration/test_measurement_uncertainty.py:289: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/storage/json_store/registry.py:117: DeprecationWarning: ax.service.utils.orchestrator_options has been moved to ax.orchestration.orchestrator_options. Please update imports to use: from ax.orchestration.orchestrator_options import OrchestratorOptions, TrialType. This backward compatibility shim will be removed in a future release.
+    from ax.service.utils.orchestrator_options import OrchestratorOptions, TrialType
+
+.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/ax/analysis/overview.py:39: DeprecationWarning: ax.service.orchestrator has been moved to ax.orchestration.orchestrator. Please update imports to use: from ax.orchestration.orchestrator import Orchestrator. This backward compatibility shim will be removed in a future release.
+    from ax.service.orchestrator import OrchestratorOptions
+
+tests/integration/test_models.py::test_real_model_fit_and_joint_prediction[gp_rbf_v1]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[stabilized]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[stabilized]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[valid_region]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[valid_region]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[remove]
+tests/integration/test_models.py::test_qlog_batch_restore_and_stale_guard[remove]
+  /home/ubuntu/projects/experiment-planner/python-version/.venv/lib/python3.12/site-packages/linear_operator/utils/cholesky.py:41: NumericalWarning: A not p.d., added jitter of 1.0e-08 to the diagonal
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/integration/test_measurement_uncertainty.py::test_bounds_preserve_semantics_recompute_and_roundtrip_with_undo
+1 failed, 114 passed, 9 warnings in 47.55s

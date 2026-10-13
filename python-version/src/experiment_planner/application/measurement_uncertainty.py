@@ -38,16 +38,33 @@ def validate_standard(amount):
         raise ValidationError("请输入有限且大于 0 的标准不确定度 1σ，数值及其平方需在可计算范围内；0 不表示未知误差")
 
 
-def plan_standard_uncertainty(template, records, measurement_names, amount, *, only_unknown=False,
-                              trusted_experiment_ids=(), trusted_factor=None, reason=""):
+def bulk_uncertainty(amount, kind="std", *, source=None):
+    """Keep entered bounds as bounds; only their standard scale is used by GP."""
+    if kind not in ("std", "bounds"):
+        raise ValidationError("统一误差请选择标准不确定度 1σ 或误差界限 ±a")
+    if kind == "std":
+        validate_standard(amount)
+    else:
+        if type(amount) not in (int, float) or not math.isfinite(amount) or amount <= 0:
+            raise ValidationError("请输入有限且大于 0 的误差界限半宽 a；例如 ±2 填 2，0 不表示未知")
+        try:
+            validate_standard(amount / math.sqrt(3))
+        except ValidationError as error:
+            raise ValidationError("误差界限 a 换算后的标准不确定度及其平方超出可计算范围") from error
+    return Uncertainty(kind=kind, amount=float(amount),
+                       distribution="uniform" if kind == "bounds" else None, source=source)
+
+
+def plan_measurement_uncertainty(template, records, measurement_names, amount, *, kind="std", only_unknown=False,
+                                 trusted_experiment_ids=(), trusted_factor=None, reason=""):
     """A preview only: derived values are recalculated by the committing service."""
-    validate_standard(amount)
+    bulk_uncertainty(amount, kind)
     trusted = list(trusted_experiment_ids)
     if trusted_factor is not None:
         if (type(trusted_factor) not in (int, float) or not math.isfinite(trusted_factor)
                 or not 0 < trusted_factor < 1):
             raise ValidationError("高可信误差比例必须大于 0 且小于 1；该比例不是准确率")
-        validate_standard(amount * trusted_factor)
+        bulk_uncertainty(amount * trusted_factor, kind)
         if (not trusted or any(type(eid) is not int for eid in trusted)
                 or not set(trusted) <= {r["id"] for r in records}):
             raise ValidationError("请在应用范围内至少选择一条高可信实验")
@@ -75,21 +92,23 @@ def plan_standard_uncertainty(template, records, measurement_names, amount, *, o
             known = standard is not None
             high_trust = old["id"] in trusted
             target = amount * trusted_factor if high_trust else amount
+            updated = bulk_uncertainty(target, kind, source=previous.source)
+            target_standard = updated.standard()
             # Never increase an already smaller, quantified uncertainty on a
             # trusted record. The baseline's fill-only rule applies to others.
-            if known and ((high_trust and standard <= target) or (not high_trust and only_unknown)):
+            if known and ((high_trust and standard <= target_standard) or (not high_trust and only_unknown)):
                 plan.skipped_known += 1
                 continue
             # Source denotes correlation, not a trust label. Preserve it; never
             # invent a common source merely because all amounts are equal.
-            updated = Uncertainty(kind="std", amount=float(target), source=previous.source)
             if previous == updated:
                 continue
             cell["uncertainty"] = asdict(updated)
             note = ""
-            if trusted_factor is not None:
-                role = "高可信" if high_trust else "基准"
-                note = f"误差设定假设：{role} 1σ={target:g} {fields[name].get('unit', '1')}"
+            if trusted_factor is not None or kind == "bounds":
+                role = "高可信" if high_trust else ("基准" if trusted_factor is not None else "统一")
+                description = f"界限 ±{target:g}（均匀分布，换算 1σ={target_standard:g}）" if kind == "bounds" else f"1σ={target:g}"
+                note = f"误差设定假设：{role} {description} {fields[name].get('unit', '1')}"
                 if high_trust:
                     note += f"（基准 {amount:g} × {trusted_factor:g}）"
             if reason:
@@ -97,7 +116,8 @@ def plan_standard_uncertainty(template, records, measurement_names, amount, *, o
             if note:
                 cell["note"] = "\n".join(filter(None, (cell.get("note", ""), note)))
             plan.details.append({"experiment_id": old["id"], "measurement": name,
-                                 "before": standard, "after": float(target),
+                                 "before": standard, "after": target_standard,
+                                 "before_setting": asdict(previous), "after_setting": asdict(updated),
                                  "role": "高可信" if high_trust else ("基准" if trusted_factor is not None else "统一"),
                                  "note": note})
             plan.changed_cells += 1
@@ -106,3 +126,8 @@ def plan_standard_uncertainty(template, records, measurement_names, amount, *, o
         if changed:
             plan.changes.append((old, new))
     return plan
+
+
+def plan_standard_uncertainty(template, records, measurement_names, amount, **kwargs):
+    """Compatibility entry point for existing standard-uncertainty callers."""
+    return plan_measurement_uncertainty(template, records, measurement_names, amount, kind="std", **kwargs)
