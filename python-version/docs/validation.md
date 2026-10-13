@@ -1,5 +1,20 @@
 # Python 源码版验证报告
 
+## 推荐批次 Excel 导出 · 2026-10-13
+
+在 `python-version/.venv` 的 Linux / Python 3.12.3 / Qt offscreen 环境完成 **190 项不同测试，全部通过**，其中新增 **20 项**（17 项集成、3 项界面）。初次新增功能检查为 20 passed；相关回归合并运行后进程以 143 结束，未产生完整汇总，该次不计为完整通过：[中止日志](evidence/batch-export-2026-10-13/tests-interrupted.txt)。随后分组取得完整通过结果：
+
+| 验证组 | 结果 | 证据 |
+| --- | --- | --- |
+| 计算、推荐、存储与导出 | 145 passed，21 warnings，63.54 秒，退出码 0 | [日志](evidence/batch-export-2026-10-13/integration-tests.txt)、[JUnit](evidence/batch-export-2026-10-13/integration-tests.xml) |
+| 界面、保存、诊断与布局 | 45 passed，181.09 秒，退出码 0 | [日志](evidence/batch-export-2026-10-13/gui-tests.txt)、[JUnit](evidence/batch-export-2026-10-13/gui-tests.xml) |
+
+运行使用 `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest ... -p no:cacheprovider`。集成组覆盖 `test_batch_export`、`test_storage`、`test_record_deletion`、`test_history_exchange`、`test_v02_strategy`、`test_models`、`test_input_uncertainty`、`test_prediction_nonfinite`；界面组覆盖 `test_batch_export_ui`、`test_window_layout`、`test_v02_desktop`、`test_failure_diagnostics`、`test_template_workflow`。21 条警告为依赖弃用、矩阵 jitter 及合成约束的可行性提示，未屏蔽。
+
+新增测试检查全部条件（数值、固定、类别、是否和自由文字）、浮点数值保留、Excel 字面文本、响应与目标区间、不可用/有限样本状态、最近批次范围、复测、旧批次审计编号恢复、模板快照、删除后编号复用、保存重开、事务失败回滚及过期推荐拒绝。GP/RBF、GP/Matérn 和贝叶斯线性分别在输入波动开/关下实际生成推荐，逐项核对工作簿中的均值和上下限与保存的后验结果一致。实际窗口回调和导出按钮覆盖成功、取消和重开。
+
+已查看[推荐页导出按钮截图](evidence/batch-export-2026-10-13/recommend-export.png)，并生成[合成数据 Excel 示例](evidence/batch-export-2026-10-13/synthetic-batch.xlsx)；[环境与示例编号](evidence/batch-export-2026-10-13/environment.json)一并保存。示例含 1 个复测与 2 个新条件。未在本轮验证 Windows 实机或真实机台数据，未声称模型预测准确度得到验证。
+
 ## 统一设置测量误差支持界限 · 2026-10-13
 
 在本目录 Linux / Python 3.12 / Qt offscreen 环境完成 **116 项不同测试**，最终均有通过结果，其中新增界限覆盖 **31 项**。首次运行 `test_uncertainty.py`、`test_measurement_uncertainty.py`（集成与 GUI）、`test_history_exchange.py`、`test_storage.py`、`test_models.py` 共 115 项，结果 **114 passed、1 failed**，47.55 秒：[日志](evidence/measurement-bounds-2026-10-13/tests.txt)、[JUnit](evidence/measurement-bounds-2026-10-13/tests.xml)。

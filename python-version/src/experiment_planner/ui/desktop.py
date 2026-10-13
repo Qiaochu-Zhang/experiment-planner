@@ -14,6 +14,7 @@ from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.template import Template
 from experiment_planner.application.template_editing import blank_template
 from experiment_planner.io.exchange import preview_import, export_import_template, export_analysis
+from experiment_planner.io.batch_export import export_batch
 from experiment_planner.ui.window import MainWindow, button
 from experiment_planner.ui.template_editor import TemplateEditor
 from experiment_planner.ui.conditions import ConditionsForm
@@ -76,6 +77,10 @@ class PythonWindow(MainWindow):
         form.insertRow(form.rowCount()-3,choose_variables);form.insertRow(form.rowCount()-3,choose_repeats)
         save_defaults=QPushButton("保存为本项目的推荐默认设置");save_defaults.clicked.connect(lambda:self.guard(self.save_batch_defaults))
         form.insertRow(form.rowCount()-3,save_defaults)
+        self.export_batch_button = QPushButton("导出本批次 Excel（完整条件与预测）")
+        self.export_batch_button.setEnabled(False)
+        self.export_batch_button.clicked.connect(lambda: self.guard(self.export_batch_data))
+        form.insertRow(form.rowCount()-1, self.export_batch_button)
         technical=QPushButton("本批次技术详情");technical.clicked.connect(lambda:self.guard(self.show_batch_details));form.addRow(technical)
         for key,w in (("n",self.n),("mode",self.mode),("baseline",self.baseline),("variables",self.variables),("repeat_ids",self.repeats),("model",self.model),("ratio_policy",self.ratio),("epsilon_nm",self.epsilon)):
             attach_help(w,key)
@@ -211,6 +216,19 @@ class PythonWindow(MainWindow):
         path, _ = QFileDialog.getSaveFileName(self, "导出当前预测 / 图线数据", "预测与趋势数据.xlsx", "Excel (*.xlsx);;CSV (*.csv)")
         if path: export_analysis(self.analysis_report, self.analysis_template, path)
 
+    def export_batch_data(self):
+        project = self.require_project()
+        batches = project.batches()
+        if not batches or not batches[-1].get("candidates"):
+            raise ValidationError("请先计算并保存含有实验的推荐批次")
+        batch_id = batches[-1]["id"]
+        path, _ = QFileDialog.getSaveFileName(self, "导出本批次完整条件与预测",
+                                            f"推荐实验_批次{batch_id}.xlsx", "Excel (*.xlsx)")
+        if path:
+            if not Path(path).suffix: path += ".xlsx"
+            export_batch(project, path, batch_id=batch_id)
+            self.statusBar().showMessage(f"已导出批次 {batch_id}：{path}", 8000)
+
     def batch_request(self):
         request = super().batch_request()
         request.exact_two = self.exact_two.isChecked()
@@ -232,6 +250,9 @@ class PythonWindow(MainWindow):
         selected_baseline=self.baseline.currentData()
         super().refresh()
         project = self.require_project()
+        if hasattr(self, "export_batch_button"):
+            batches = project.batches()
+            self.export_batch_button.setEnabled(bool(batches and batches[-1].get("candidates")))
         if isinstance(project, ProjectSession):
             self.summary.setText(self.summary.text().replace(str(project.path), str(project.target_path)) + ("\n有未保存变化；点击“保存项目”写回文件。" if project.dirty else "\n项目已保存。"))
         if hasattr(self, "template_view"):
@@ -280,6 +301,7 @@ class PythonWindow(MainWindow):
         super().close_project()
         self.loaded_template_key=None
         self.analysis_report=None
+        if hasattr(self, "export_batch_button"): self.export_batch_button.setEnabled(False)
         if hasattr(self,"home_summary"):self.home_summary.setText("请新建或打开项目。")
         for name in ("template_view", "conditions", "plot_ranges", "plot_variables", "analysis_output", "plot_image"):
             if hasattr(self, name):

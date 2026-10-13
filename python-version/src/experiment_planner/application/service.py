@@ -226,10 +226,12 @@ class PlannerService:
         if len(batch["candidates"]) > batch["request"]["n"]: raise ValidationError("批次超过总配额")
         for candidate in batch["candidates"]: p.template.validate_conditions(candidate["conditions"])
         with p.transaction(batch["revision"]):
-            cursor = p.db.execute("INSERT INTO batches(revision,payload) VALUES(?,?)", (p.revision, encode(batch)))
+            saved_batch = copy.deepcopy(batch)
+            saved_batch["template_snapshot"] = p.template.data
+            cursor = p.db.execute("INSERT INTO batches(revision,payload) VALUES(?,?)", (p.revision, encode(saved_batch)))
             bid = cursor.lastrowid
             ids = []
-            for candidate in batch["candidates"]:
+            for candidate in saved_batch["candidates"]:
                 record = self.prepare_record(candidate["conditions"], {}, status="pending", suggested=candidate["conditions"])
                 record.update({"batch_id": bid, "prediction": candidate.get("prediction"), "arrangement": candidate.get("arrangement", "new"), "changes": candidate.get("changes", {})})
                 for name in ("repeat_of","baseline_id","cross_members"):
@@ -239,6 +241,9 @@ class PlannerService:
                         record[ref + "_uid"] = p.experiment(candidate[ref]).get("record_uid")
                 c = p.insert_experiment(record)
                 ids.append(c.lastrowid)
+                candidate["experiment_id"] = c.lastrowid
+                candidate["record_uid"] = record["record_uid"]
+            p.db.execute("UPDATE batches SET payload=? WHERE id=?", (encode(saved_batch), bid))
             p.bump()
             p.log("batch", bid, None, {"experiment_ids": ids, "source_revision": batch["revision"]})
         self._undo.clear(); self._redo.clear()
