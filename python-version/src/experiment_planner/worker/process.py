@@ -21,8 +21,8 @@ def _run(connection, snapshot, request, operation):
         result["diagnostics"] = list(dict.fromkeys(f"{w.category.__name__}: {w.message}" for w in captured))
         connection.send({"result": result})
     except Exception as exc:
-        from experiment_planner.ui.messages import user_error
-        connection.send({"error": user_error(exc), "diagnostic": f"{type(exc).__name__}: {exc}"})
+        from experiment_planner.ui.messages import user_error, exception_diagnostic
+        connection.send({"error": user_error(exc), "diagnostic": exception_diagnostic(exc)})
     finally: connection.close()
 
 
@@ -32,6 +32,7 @@ class CalculationTask:
     def __init__(self, project, request, operation="generate"):
         if operation not in ("generate", "analyze"):
             raise ValidationError("未知计算操作")
+        self.operation = operation
         self.key = str(project.path)
         if self.key in self.active: raise ValidationError("本项目已有生成任务，请等待或取消")
         self.lock=FileLock(self.key+".generate.lock")
@@ -54,15 +55,30 @@ class CalculationTask:
         child.close()
 
     def poll(self):
+        if not self.connection.poll() and self.process.is_alive():
+            return None
+        # Recheck after process exit: the last payload may have arrived between
+        # the first pipe poll and the liveness check.
         if self.connection.poll():
-            try: result = self.connection.recv()
-            except EOFError: result = {"error": "计算进程意外退出，项目未修改"}
-            self.finish()
-            return result
-        if not self.process.is_alive():
-            self.finish()
-            return {"error": "计算进程退出但未返回结果，项目未修改"}
-        return None
+            try:
+                result = self.connection.recv()
+            except EOFError:
+                result = self.exit_failure("通信管道已关闭，未收到计算结果（EOFError）")
+        else:
+            result = self.exit_failure("计算进程退出但未返回结果")
+        self.finish()
+        return result
+
+    def exit_failure(self, reason):
+        self.process.join(timeout=.2)
+        return {
+            "error": "计算进程意外退出，项目未修改。请查看原始诊断。",
+            "diagnostic": (
+                f"{reason}\n计算类型：{self.operation}\n"
+                f"进程 PID：{self.process.pid}\n退出码：{self.process.exitcode}\n"
+                "进程未返回 Python 异常内容，无法提供原始异常堆栈。"
+            ),
+        }
 
     def finish(self):
         self.process.join(timeout=.2)

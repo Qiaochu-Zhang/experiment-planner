@@ -346,18 +346,16 @@ class PythonWindow(MainWindow):
         self.analysis_timer.start()
 
     def poll_analysis(self):
-        if self.analysis_task is None:
-            return
-        result = self.analysis_task.poll()
+        result = self.poll_calculation("analysis_task", self.analysis_timer, self.analyze_button)
         if result is None:
             return
-        self.analysis_task = None
-        self.analysis_timer.stop()
-        self.analyze_button.setEnabled(True)
         if "error" in result:
-            self.analysis_output.setPlainText(result["error"])
+            self.analysis_output.setPlainText(result["error"] + "\n点击窗口顶部“查看原始诊断”可重新查看本次失败详情。")
+            self.show_failure(result["error"], result.get("diagnostic"), "预测 / 绘图未完成")
             return
-        report = result["result"]
+        self.guard(lambda: self.display_analysis(result["result"]))
+
+    def display_analysis(self, report):
         self.analysis_report=report
         message = analysis_text(report,self.analysis_template)
         if report["revision"] != self.require_project().revision:

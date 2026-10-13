@@ -15,7 +15,8 @@ from experiment_planner.io.exchange import preview_import, export_records
 from experiment_planner.storage.project import Project
 from experiment_planner.precision.rounding import display
 from experiment_planner.ui.help import attach_help, help_label, HelpFilter
-from experiment_planner.ui.messages import user_error, batch_text
+from experiment_planner.ui.messages import user_error, batch_text, exception_diagnostic
+from experiment_planner.ui.diagnostics import show_failure_dialog
 from experiment_planner.ui.tree_editor import chinese_buttons, JsonTreeEditor
 
 
@@ -158,6 +159,13 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(next_page,"下一批实验")
         self.undo_button = attach_help(button("撤销上一步 (Ctrl+Z)", lambda:self.guard(lambda:self.history_step(False)), toolbar), "history")
         self.redo_button = attach_help(button("重做下一步 (Ctrl+Y)", lambda:self.guard(lambda:self.history_step(True)), toolbar), "history")
+        self.last_failure = None
+        diagnostic_row = QHBoxLayout()
+        layout.insertLayout(1, diagnostic_row)
+        self.diagnostic_button = button("查看原始诊断", self.show_last_failure, diagnostic_row)
+        self.diagnostic_button.setToolTip("重新查看本窗口最近一次失败的原始诊断")
+        self.diagnostic_button.setEnabled(False)
+        diagnostic_row.addStretch()
         QApplication.instance().installEventFilter(self)
         self.timer=QTimer(self);self.timer.setInterval(200);self.timer.timeout.connect(self.poll)
         self.setStyleSheet("QMainWindow {background:#f4f7fa;} QPushButton {padding:7px 10px;} QTabWidget::pane {border:1px solid #d9e1e8;} QLineEdit,QComboBox,QSpinBox {padding:5px;} QTableWidget {background:white;}")
@@ -193,9 +201,37 @@ class MainWindow(QMainWindow):
     def guard(self, callback):
         try: callback()
         except Exception as exc:
-            box=QMessageBox(self);box.setWindowTitle("操作未完成");box.setIcon(QMessageBox.Icon.Warning)
-            box.setText(user_error(exc));box.setDetailedText(f"{type(exc).__name__}: {exc}")
-            box.setStandardButtons(QMessageBox.StandardButton.Ok);box.button(QMessageBox.StandardButton.Ok).setText("知道了");box.exec()
+            self.show_failure(user_error(exc), exception_diagnostic(exc))
+
+    def show_failure(self, message, diagnostic=None, title="操作未完成"):
+        diagnostic = diagnostic or "未收到原始诊断。已收到的错误信息：\n" + message
+        self.last_failure = (message, diagnostic, title)
+        self.diagnostic_button.setEnabled(True)
+        show_failure_dialog(self, message, diagnostic, title)
+
+    def show_last_failure(self):
+        if self.last_failure:
+            message, diagnostic, title = self.last_failure
+            show_failure_dialog(self, message, diagnostic, title, expanded=True)
+
+    def poll_calculation(self, attribute, timer, start_button):
+        task = getattr(self, attribute)
+        if task is None:
+            return None
+        try:
+            result = task.poll()
+        except Exception as exc:
+            diagnostic = exception_diagnostic(exc)
+            try:
+                task.cancel()
+            except Exception as cleanup_error:
+                diagnostic += "\n清理计算进程时发生异常：\n" + exception_diagnostic(cleanup_error)
+            result = {"error": user_error(exc), "diagnostic": diagnostic}
+        if result is not None:
+            setattr(self, attribute, None)
+            timer.stop()
+            start_button.setEnabled(True)
+        return result
 
     def require_project(self):
         if self.service is None: raise ValidationError("请先打开或新建项目")
@@ -323,12 +359,13 @@ class MainWindow(QMainWindow):
         return BatchRequest(n=self.n.value(),mode=self.mode.currentData(),baseline_id=self.baseline.currentData(),variables=[x.strip() for x in self.variables.text().split(",") if x.strip()],repeat_ids=[int(x) for x in self.repeats.text().split(",") if x.strip()],model=self.model.currentData())
 
     def poll(self):
-        if self.task is None:return
-        result=self.task.poll()
+        result=self.poll_calculation("task", self.timer, self.generate_button)
         if result is None:return
-        self.task=None;self.timer.stop();self.generate_button.setEnabled(True)
         def finish():
-            if "error" in result:raise ValidationError(result["error"])
+            if "error" in result:
+                self.details.setPlainText(result["error"] + "\n点击窗口顶部“查看原始诊断”可重新查看本次失败详情。")
+                self.show_failure(result["error"], result.get("diagnostic"), "推荐计算未完成")
+                return
             self.service.commit_batch(result["result"]);self.refresh()
         self.guard(finish)
 

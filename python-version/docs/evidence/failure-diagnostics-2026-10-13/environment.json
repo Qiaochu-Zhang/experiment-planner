@@ -1,0 +1,16 @@
+{
+  "python": "3.12.3",
+  "platform": "Linux",
+  "source": "/home/ubuntu/projects/experiment-planner/python-version/src/experiment_planner/__init__.py",
+  "qt_platform": "offscreen",
+  "packages": {
+    "PySide6": "6.12.0",
+    "pytest": "9.1.1",
+    "torch": "2.8.0+cpu",
+    "ax-platform": "1.3.1",
+    "botorch": "0.18.1",
+    "gpytorch": "1.15.2",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1"
+  }
+}

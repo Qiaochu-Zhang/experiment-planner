@@ -1,8 +1,14 @@
 """Chinese presentation; original diagnostics remain available for debugging."""
 import json
+import traceback
 
 from experiment_planner.precision.rounding import display
 from experiment_planner.domain.errors import ValidationError, StaleVersionError
+
+
+def exception_diagnostic(error):
+    """Preserve the exception type, message, traceback and chained causes."""
+    return "".join(traceback.format_exception(error))
 
 
 def user_error(error):

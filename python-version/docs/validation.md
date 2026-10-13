@@ -1,5 +1,29 @@
 # Python 源码版验证报告
 
+## 计算失败原始诊断 · 2026-10-13
+
+改动范围仅 `python-version`。使用本目录独立虚拟环境，在 Linux / CPython 3.12.3 / PySide6 6.12.0 / Qt offscreen 下分组验证：**74 项相关测试通过，0 失败，0 错误，0 跳过，两组进程退出码均为 0**。依赖检查 `pip check` 通过，加载的源码来自本目录。[环境](evidence/failure-diagnostics-2026-10-13/environment.json)、[结果汇总](evidence/failure-diagnostics-2026-10-13/summary.json)。
+
+| 验证 | 结果与覆盖内容 |
+| --- | --- |
+| 完整 GUI 测试目录 | **64 项通过**，308.11 秒。包括新增 9 项诊断界面测试，以及原有模板、保存、撤销、选择、帮助、预测范围、普通/小窗口/最大化/全屏/恢复及放大字体回归。[日志](evidence/failure-diagnostics-2026-10-13/gui-tests.txt)、[JUnit](evidence/failure-diagnostics-2026-10-13/gui-tests.xml)。 |
+| 后台和启动相关集成测试 | **10 项通过**，32.37 秒。包括新增 4 项真实子进程测试，以及原有取消、正常预测、单/双变量绘图、独立启动和界面清理检查。[日志](evidence/failure-diagnostics-2026-10-13/worker-tests.txt)、[JUnit](evidence/failure-diagnostics-2026-10-13/worker-tests.xml)。 |
+| 新诊断交互 | 实际点击弹窗展开按钮与复制按钮，核对原始 Unicode 文本和剪贴板全文，关闭后通过顶部按钮重看；连续失败更新最近诊断，成功计算保留最近失败，缺失诊断时显示明确说明。覆盖校验、启动、管道读取、结果展示与批次提交失败。 |
+| 后台错误内容 | 推荐与分析的真实 spawn 子进程返回异常类型、原始消息及调用堆栈；主动终止子进程后返回 PID、退出码和缺失堆栈说明，锁释放、项目快照不变。 |
+| 独立启动与预览 | `main.py --smoke` 退出码 0，[启动日志](evidence/failure-diagnostics-2026-10-13/smoke.txt)。实际查看 [顶部重新打开入口](evidence/failure-diagnostics-2026-10-13/reopen-button.png) 和 [展开后的诊断窗口](evidence/failure-diagnostics-2026-10-13/expanded-diagnostic.png)，再次核对展开和复制内容；截图使用合成错误，不是用户实际故障。 |
+
+最初尝试运行整个测试集合时，进程以退出码 143 中断，没有产生完整结果；[中断日志](evidence/failure-diagnostics-2026-10-13/full-suite-interrupted.txt) 不计入通过数量。随后完成上述分组相关验证，本轮不声明全部模型及数值测试通过，也未进行 Windows 实机或 Python 3.13 验证。原始诊断入口已验证，不代表已确定或解决用户原先计算失败的具体原因。
+
+新增测试：[诊断交互](../tests/gui/test_failure_diagnostics.py)、[真实后台失败](../tests/integration/test_worker_failures.py)。操作见 [回答.md](../回答.md) 第 49 节。
+
+复现（在 `python-version`，已安装依赖的独立环境）：
+
+```bash
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -p no:cacheprovider tests/gui
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -p no:cacheprovider tests/integration/test_worker_failures.py tests/integration/test_worker_plots.py tests/integration/test_python_edition.py
+QT_QPA_PLATFORM=offscreen .venv/bin/python main.py --smoke
+```
+
 ## 绘图范围与预测问答 · 2026-10-12
 
 改动范围仅 `python-version`。在 Linux / CPython 3.12.3 / PySide6 6.11.2 / Qt offscreen 环境执行完整测试：**247 项通过，0 失败，0 跳过，退出码 0**，耗时 254.02 秒；14 条依赖弃用或数值稳定提示。[完整日志](evidence/trend-ranges-2026-10-12/tests.txt)、[JUnit](evidence/trend-ranges-2026-10-12/tests.xml)。

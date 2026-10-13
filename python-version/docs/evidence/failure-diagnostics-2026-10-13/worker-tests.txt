@@ -1,0 +1,20 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /home/ubuntu/projects/experiment-planner/python-version/.venv/bin/python
+rootdir: /home/ubuntu/projects/experiment-planner/python-version
+configfile: pyproject.toml
+plugins: platformdirs-4.13.0
+collecting ... collected 10 items
+
+tests/integration/test_worker_failures.py::test_spawned_worker_returns_original_exception_and_traceback[generate] PASSED [ 10%]
+tests/integration/test_worker_failures.py::test_spawned_worker_returns_original_exception_and_traceback[analyze] PASSED [ 20%]
+tests/integration/test_worker_failures.py::test_abrupt_worker_exit_has_readable_exit_diagnostic_and_releases_lock[generate] PASSED [ 30%]
+tests/integration/test_worker_failures.py::test_abrupt_worker_exit_has_readable_exit_diagnostic_and_releases_lock[analyze] PASSED [ 40%]
+tests/integration/test_worker_plots.py::test_cancel_worker_preserves_project PASSED [ 50%]
+tests/integration/test_worker_plots.py::test_local_one_and_two_dimensional_plots[False] PASSED [ 60%]
+tests/integration/test_worker_plots.py::test_local_one_and_two_dimensional_plots[True] PASSED [ 70%]
+tests/integration/test_python_edition.py::test_launchers_work_without_parent_repository PASSED [ 80%]
+tests/integration/test_python_edition.py::test_analysis_worker_does_not_write_project PASSED [ 90%]
+tests/integration/test_python_edition.py::test_extended_desktop_requests_and_cleanup PASSED [100%]
+
+- generated xml file: /home/ubuntu/projects/experiment-planner/python-version/docs/evidence/failure-diagnostics-2026-10-13/worker-tests.xml -
+============================= 10 passed in 32.37s ==============================

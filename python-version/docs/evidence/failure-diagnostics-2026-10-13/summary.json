@@ -1,0 +1,25 @@
+{
+  "groups": {
+    "gui": {
+      "tests": 64,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "seconds": 308.093,
+      "exit_code": 0
+    },
+    "worker": {
+      "tests": 10,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "seconds": 32.367,
+      "exit_code": 0
+    }
+  },
+  "smoke_exit_code": 0,
+  "pip_check": "passed",
+  "full_suite_attempt_exit_code": 143,
+  "full_suite_attempt": "Interrupted before completion; excluded from passed test count.",
+  "passed_tests": 74
+}
