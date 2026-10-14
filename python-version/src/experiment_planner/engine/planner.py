@@ -12,6 +12,7 @@ from experiment_planner.engine.ax_bridge import rebuild, snapshot as ax_snapshot
 from experiment_planner.engine.models import fit_models
 from experiment_planner.engine.objectives import Objectives, prediction_summary
 from experiment_planner.engine.space import BatchRequest, candidate_pool, changes, key
+from experiment_planner.engine.coverage import BatchCoverage, coverage_variables
 from experiment_planner.knowledge.priors import check_capabilities
 from experiment_planner.engine.exploration import candidate_statistics, adjusted_scores, dedicated_scores
 from experiment_planner.domain.input_uncertainty import uncertainty_info, INPUT_UNCERTAINTY_NOTICE
@@ -53,6 +54,13 @@ def generate(snapshot, request):
         pool = []
     else:
         pool = candidate_pool(template, request, excluded=[r["actual"] for r in records] + [c["conditions"] for c in candidates])
+    coverage = BatchCoverage(template, coverage_variables(template, request) if request.mode != "cross" else [])
+    available_coverage = BatchCoverage(template, list(coverage.fields))
+    for candidate in candidates:
+        coverage.add(candidate["conditions"])
+        available_coverage.add(candidate["conditions"])
+    for condition in pool:
+        available_coverage.add(condition)
     # Insufficient responses are an initialization state, never synthetic predictions.
     counts = {}
     for response in template.responses:
@@ -117,8 +125,9 @@ def generate(snapshot, request):
                 else:
                     selection_scores = adjusted_scores(scores, uncertainty, feasibility, request.exploration_strength)
                     arrangement = "new"
-                chosen = int(selection_scores.argmax())
+                chosen = coverage.choose(pool, selection_scores.tolist())
                 condition = pool.pop(chosen)
+                coverage.add(condition)
                 candidates.append({"conditions": condition, "arrangement": arrangement, "log_acquisition": scores[chosen].item(), "selection_score": selection_scores[chosen].item(), "normalized_uncertainty": uncertainty[chosen].item(), "selection_feasibility": feasibility[chosen].item()})
                 mask = torch.arange(len(uncertainty)) != chosen
                 uncertainty, feasibility = uncertainty[mask], feasibility[mask]
@@ -127,7 +136,9 @@ def generate(snapshot, request):
             if request.exploration_strength or request.exploration_count:
                 notices.append(f"探索强度 {request.exploration_strength:g}；专门探索要求 {request.exploration_count} 个，实际生成 {sum(c['arrangement'] == 'exploration' for c in candidates)} 个；评分使用标准化目标不确定性、可行概率，专门探索额外考虑与待做条件的距离")
     else:
-        for i, condition in enumerate(pool[:max(0, request.n-len(candidates))]):
+        for i in range(min(len(pool), max(0, request.n-len(candidates)))):
+            condition = pool.pop(coverage.choose(pool))
+            coverage.add(condition)
             candidates.append({"conditions": condition, "arrangement": "exploration" if i < request.exploration_count else "initialization"})
         if request.exploration_count:
             notices.append("数据不足，专门探索名额使用初始化候选；其余新条件也处于初始化阶段，尚未执行模型优化")
@@ -148,4 +159,16 @@ def generate(snapshot, request):
     exploration_info["actual_count"] = sum(c["arrangement"] == "exploration" for c in candidates)
     if uncertainty_info(template):
         exploration_info["input_uncertainty"] = uncertainty_info(template)
-    return {"revision": snapshot["revision"], "template_version": template.data["template_version"], "request": asdict(request), "stage": stage, "candidates": candidates, "shortfall": shortfall, "notices": notices, "reference_point": reference, "exploration": exploration_info, "model_datasets": datasets, "ax_snapshot": ax_snapshot(ax_experiment, ax_mapping), "versions": {p: importlib.metadata.version(p) for p in ("ax-platform", "botorch", "torch")}}
+    coverage_info = coverage.report() if request.mode != "cross" else None
+    if coverage_info is not None:
+        coverage_info["pool_constant_variables"] = available_coverage.report()["constant_variables"]
+        labels = {p["name"]: p.get("label", p["name"]) for p in template.parameters}
+        if coverage_info["constant_variables"]:
+            names = "、".join(labels[name] for name in coverage_info["constant_variables"])
+            notices.append(f"变量覆盖：本批次（含复测）仍未出现不同取值的参数：{names}。已尽量覆盖；可能受本轮名额、复测占位、模式、执行网格、约束、历史去重或有限候选池影响；未放宽限制。")
+            if coverage_info["pool_constant_variables"]:
+                names = "、".join(labels[name] for name in coverage_info["pool_constant_variables"])
+                notices.append(f"当前候选池与指定复测中未找到不同取值：{names}。有限采样不证明全空间无法变化；可检查限制或增大候选池。")
+        elif coverage_info["requested_variables"]:
+            notices.append(f"变量覆盖：本批次（含复测）的 {len(coverage_info['requested_variables'])} 项允许变化参数均出现不同取值。单/双变量限制作用于每条新实验，变化的变量可逐条不同。")
+    return {"revision": snapshot["revision"], "template_version": template.data["template_version"], "request": asdict(request), "stage": stage, "candidates": candidates, "shortfall": shortfall, "notices": notices, "reference_point": reference, "exploration": exploration_info, "variable_coverage": coverage_info, "model_datasets": datasets, "ax_snapshot": ax_snapshot(ax_experiment, ax_mapping), "versions": {p: importlib.metadata.version(p) for p in ("ax-platform", "botorch", "torch")}}

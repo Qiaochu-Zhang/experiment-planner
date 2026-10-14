@@ -42,7 +42,7 @@ class PythonWindow(MainWindow):
 
         form = self.tabs.widget(1).layout()
         self.mode.addItem("基准 / 单 A / 单 B / AB 交叉布局", "cross")
-        self.exact_two = QCheckBox("双变量模式恰好改变两项")
+        self.exact_two = QCheckBox("双变量模式每条实验恰好改变两项")
         self.cross_fields = [QComboBox(), QComboBox()]
         self.cross_inputs = [QLineEdit(), QLineEdit()]
         cross_row = QHBoxLayout()
@@ -537,7 +537,7 @@ class PythonWindow(MainWindow):
             self.quota_hint.setText(f"交叉布局：{layout_count} 组 + 额外复测 {count} 次，需要 {layout_count+count} 个名额；其余名额不自动填充。专门探索应设为 0，探索强度不改变指定布局。")
             return
         remaining=self.n.value()-count-self.exploration_count.value()
-        self.quota_hint.setText(f"名额预览：复测 {count} + 专门探索 {self.exploration_count.value()} + 常规新条件 {remaining} = 总数 {self.n.value()}。"+(" 名额超出，请调整。" if remaining<0 else " 数据不足时新条件均使用初始化策略。"))
+        self.quota_hint.setText(f"名额预览：复测 {count} + 专门探索 {self.exploration_count.value()} + 常规新条件 {remaining} = 总数 {self.n.value()}。"+(" 名额超出，请调整。" if remaining<0 else " 数据不足时新条件均使用初始化策略。")+"\n整批优先让各允许变化参数出现不同取值；单/双变量限制每条新实验的变化项数，具体变量可逐条不同。覆盖后按原评分选择；无法覆盖时列出未变化参数。")
 
     def select_items(self,title,items,selected):
         dialog=QDialog(self);dialog.setWindowTitle(title);dialog.resize(480,500);layout=QVBoxLayout(dialog);choices=QListWidget();layout.addWidget(choices)

@@ -4,6 +4,7 @@ import random
 from dataclasses import asdict, dataclass, field
 
 from experiment_planner.domain.errors import ValidationError
+from experiment_planner.engine.coverage import coverage_variables, different, retain_coverage
 from experiment_planner.precision.rounding import decimal, grid_spec, quantize
 
 
@@ -57,13 +58,7 @@ def changes(template, baseline, candidate):
     result = {}
     for p in template.parameters:
         k = p["name"]
-        # Execution grids have exact decimal semantics; unquantized floats use
-        # 1e-10 of the declared range as a documented comparison tolerance.
-        if p.get("value_type", "float") in ("float", "int"):
-            tolerance = 0 if grid_spec(p.get("execution_rounding", {})) else 1e-10 * max(1, (p.get("bounds", [0, 1])[1] - p.get("bounds", [0, 1])[0]))
-            different = abs(decimal(candidate[k])-decimal(baseline[k])) > decimal(tolerance)
-        else: different = candidate[k] != baseline[k]
-        if different:
+        if different(p, baseline[k], candidate[k]):
             result[k] = {"before": baseline[k], "after": candidate[k], "delta": candidate[k]-baseline[k] if p.get("value_type", "float") in ("float", "int") else None}
     return result
 
@@ -122,4 +117,4 @@ def candidate_pool(template, request, excluded=()):
             blocked.add(key(candidate))
             candidates.append(candidate)
     rng.shuffle(candidates)
-    return candidates[:request.pool_size]
+    return retain_coverage(template, coverage_variables(template, request), candidates, request.pool_size)

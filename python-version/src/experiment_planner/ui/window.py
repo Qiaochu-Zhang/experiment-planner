@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
         for label,code in (("默认 GP / RBF","gp_rbf_v1"),("GP / Matérn 2.5","gp_matern25_v1"),("贝叶斯线性回归（非 GP）","bayesian_linear_v1")): self.model.addItem(label,code)
         self.n=QSpinBox();self.n.setRange(1,100);self.n.setValue(6)
         self.mode=QComboBox()
-        for label,code in (("全范围搜索","full_space"),("相对基准恰好改变一项","single"),("相对基准最多改变两项","double")): self.mode.addItem(label,code)
+        for label,code in (("全范围搜索","full_space"),("每条实验相对基准恰好改变一项","single"),("每条实验相对基准最多改变两项","double")): self.mode.addItem(label,code)
         self.baseline=QComboBox()
         self.variables=QLineEdit();self.variables.setPlaceholderText("可选：内部字段名，逗号分隔；留空自动选择")
         self.repeats=QLineEdit();self.repeats.setPlaceholderText("可选：实验编号，逗号分隔；全部计入本轮 n")

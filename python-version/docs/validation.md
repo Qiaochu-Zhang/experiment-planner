@@ -1,5 +1,23 @@
 # Python 源码版验证报告
 
+## 下一批实验覆盖所选变量 · 2026-10-14
+
+在 `python-version/.venv` 的 Linux / Python 3.12.3 / Qt offscreen 环境完成 **231 项相关测试，全部通过，0 失败、0 跳过，退出码 0**，其中新增 **46 项**。运行耗时 91.94 秒，保留 21 条依赖弃用、矩阵 jitter 及合成输出约束提示：[日志](evidence/batch-coverage-2026-10-14/tests.txt)、[JUnit](evidence/batch-coverage-2026-10-14/tests.xml)。
+
+新增检查覆盖：选中六个变量、推荐十条实验，全范围、单变量、双变量及恰好两项均让各选中参数在本批出现不同取值；三个随机种子的初始化，以及 GP/RBF、GP/Matérn、贝叶斯线性的真实推荐。另用受控评分构造十个高分候选都集中在同一个变量或同一对变量的回归场景，验证探索强度和名额均为 0 时仍能覆盖其余变量，且覆盖完成后恢复原评分排序。
+
+同时检查候选池截取保留稀有变化、每条变化项数、冻结未选字段、数值比较容差与执行网格、类别/是否/离散文字、隐式变量名单、复测与专门探索配额、约束及历史去重、名额/候选不足和空候选池、指定交叉布局、保存重开、界面文字及 Excel 提示。已有输入波动、目标策略、工作进程、存储、导出和相关界面/布局测试一并通过。
+
+复现命令（在 `python-version/` 内）：
+
+```bash
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/unit tests/integration/test_batch_coverage.py tests/integration/test_v02_strategy.py tests/integration/test_models.py tests/integration/test_input_uncertainty.py tests/integration/test_batch_export.py tests/integration/test_storage.py tests/integration/test_worker_failures.py tests/gui/test_v02_desktop.py tests/gui/test_batch_export_ui.py tests/gui/test_window_layout.py -q -p no:cacheprovider
+```
+
+开发中首次新增检查因测试文件重名而收集失败，改为唯一文件名；随后测试样例漏填执行取整模式，补齐合法配置后首轮 45 项通过。再增加 6 项评分偏置、混合输入与空候选检查，完成上述 231 项综合回归。未修改生产校验规则来迁就测试。未做 Windows 实机或真实机台数据验证，也不以合成测试证明预测效果。
+
+当前覆盖是有限候选池上的贪心选择，可能牺牲部分即时优化评分，不保证全局最佳覆盖、每项变化次数相等或完整因子设计；受限时明确报告实际未变化字段。
+
 ## 推荐批次 Excel 导出 · 2026-10-13
 
 在 `python-version/.venv` 的 Linux / Python 3.12.3 / Qt offscreen 环境完成 **190 项不同测试，全部通过**，其中新增 **20 项**（17 项集成、3 项界面）。初次新增功能检查为 20 passed；相关回归合并运行后进程以 143 结束，未产生完整汇总，该次不计为完整通过：[中止日志](evidence/batch-export-2026-10-13/tests-interrupted.txt)。随后分组取得完整通过结果：
