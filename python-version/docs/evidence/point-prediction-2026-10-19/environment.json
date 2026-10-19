@@ -1,0 +1,49 @@
+{
+  "python": "3.12.3",
+  "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+  "qt_platform": "offscreen",
+  "data": "synthetic_only",
+  "model": "gp_rbf_v1",
+  "points": 3,
+  "window_checks": [
+    {
+      "size": [
+        1024,
+        650
+      ],
+      "buttons_reachable": true
+    },
+    {
+      "size": [
+        1440,
+        900
+      ],
+      "buttons_reachable": true
+    }
+  ],
+  "font150": "export button reachable",
+  "project_unchanged": true,
+  "core_tests": {
+    "tests": 416,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 173.77
+  },
+  "interrupted_combined_run": {
+    "exit_code": 143,
+    "result": "No complete pytest summary; not counted as a passing run",
+    "cause": "Not established"
+  },
+  "new_tests": {
+    "integration": 20,
+    "gui": 11,
+    "total": 31
+  },
+  "initial_focused_checks": {
+    "tests": 38,
+    "failures": 0,
+    "seconds": 134.27
+  }
+}

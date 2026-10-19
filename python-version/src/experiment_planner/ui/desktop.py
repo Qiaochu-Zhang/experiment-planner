@@ -15,10 +15,12 @@ from experiment_planner.domain.template import Template
 from experiment_planner.application.template_editing import blank_template
 from experiment_planner.io.exchange import preview_import, export_import_template, export_analysis
 from experiment_planner.io.batch_export import export_batch
+from experiment_planner.io.prediction_export import export_point_predictions
 from experiment_planner.ui.window import MainWindow, button
 from experiment_planner.ui.template_editor import TemplateEditor
 from experiment_planner.ui.conditions import ConditionsForm
 from experiment_planner.ui.plot_ranges import PlotRangesForm
+from experiment_planner.ui.point_prediction import PointPredictionPanel
 from experiment_planner.ui.help import attach_help, help_label, show_help
 from experiment_planner.ui.tree_editor import chinese_buttons
 from experiment_planner.ui.messages import analysis_text
@@ -36,6 +38,7 @@ class PythonWindow(MainWindow):
         self.analysis_report = None
         self.summary.setText("新建或打开本地项目，录入实验后规划下一批条件。")
         self.analysis_task = None
+        self.analysis_kind = "single"
         self.analysis_timer = QTimer(self)
         self.analysis_timer.setInterval(200)
         self.analysis_timer.timeout.connect(self.poll_analysis)
@@ -145,8 +148,23 @@ class PythonWindow(MainWindow):
         self.plot_image = QLabel()
         self.plot_image.setAlignment(Qt.AlignCenter)
         analysis_layout.addWidget(self.plot_image)
-        self.tabs.addTab(analysis_page, "预测 / 趋势图")
         button("预测技术详情",lambda:self.guard(lambda:self.show_details(self.analysis_report or {})),analysis_layout)
+        self.single_prediction_page = analysis_page
+        self.prediction_tabs = QTabWidget()
+        self.prediction_tabs.addTab(analysis_page, "单点预测 / 趋势图")
+        self.point_prediction = PointPredictionPanel()
+        self.point_prediction.copy_requested.connect(lambda:self.guard(self.copy_point_conditions))
+        self.point_prediction.predict_requested.connect(lambda:self.guard(self.start_point_prediction))
+        self.point_prediction.cancel_requested.connect(self.cancel_analysis)
+        self.point_prediction.export_requested.connect(lambda:self.guard(self.export_point_prediction_data))
+        self.point_prediction.details_requested.connect(lambda:self.guard(lambda:self.show_details(self.point_prediction.report or {})))
+        self.model.currentTextChanged.connect(self.update_prediction_model_hint)
+        self.seed.valueChanged.connect(self.update_prediction_model_hint)
+        self.update_prediction_model_hint()
+        self.prediction_tabs.addTab(self.point_prediction, "批量实验点预测")
+        self.tabs.addTab(self.prediction_tabs, "预测 / 趋势图")
+        record_actions = self.tabs.widget(0).layout().itemAt(0).layout()
+        self.copy_points_button = button("复制所选条件到批量预测", lambda:self.guard(self.copy_point_conditions), record_actions)
         self.build_workspace()
         project_actions = QHBoxLayout()
         self.centralWidget().layout().insertLayout(1, project_actions)
@@ -229,6 +247,17 @@ class PythonWindow(MainWindow):
             export_batch(project, path, batch_id=batch_id)
             self.statusBar().showMessage(f"已导出批次 {batch_id}：{path}", 8000)
 
+    def export_point_prediction_data(self):
+        self.require_project()
+        panel = self.point_prediction
+        if panel.report is None:
+            raise ValidationError("请先完成批量实验点预测")
+        path, _ = QFileDialog.getSaveFileName(self, "导出批量实验点预测", "实验点批量预测.xlsx", "Excel (*.xlsx)")
+        if path:
+            if not Path(path).suffix: path += ".xlsx"
+            export_point_predictions(panel.report, panel.report_template, path)
+            self.statusBar().showMessage(f"已导出 {len(panel.report['conditions'])} 个实验点的预测：{path}", 8000)
+
     def batch_request(self):
         request = super().batch_request()
         request.exact_two = self.exact_two.isChecked()
@@ -259,6 +288,7 @@ class PythonWindow(MainWindow):
             project=self.require_project();template=project.template
             key=(str(project.path),template.data["template_version"])
             if key!=self.loaded_template_key:
+                self.point_prediction.set_template(template)
                 self.conditions.set_template(template)
                 self.plot_ranges.set_template(template)
                 self.plot_ranges.set_variables(self.plot_variables.text())
@@ -288,6 +318,7 @@ class PythonWindow(MainWindow):
             goals="\n".join(f"• {labels.get(o['metric'],o['metric'])}："+{"identity":"原值","abs":"绝对值","absolute_distance":f"距 {o.get('target',0)} 的距离"}.get(o.get("transform","identity"),"")+"，"+{"maximize":"尽量大","minimize":"尽量小"}[o["direction"]] for o in template.data["objectives"])
             self.template_view.setPlainText(f"模板：{template.data.get('name','')}\n版本：{template.data['template_version']}\n\n当前目标：\n{goals}\n\n先验关系：{len(template.data.get('knowledge_priors',[]))} 条\n\n所有设置均可通过“编辑项目模板”修改；全部属性使用树形表单。旧项目目标保留原定义。")
             if hasattr(self,"home_summary"):self.home_summary.setText(self.summary.text()+"\n\n"+goals)
+            self.point_prediction.mark_revision(project.revision)
 
     def close_project(self):
         if self.service and isinstance(self.service.project, ProjectSession) and self.service.project.dirty:
@@ -301,6 +332,7 @@ class PythonWindow(MainWindow):
         super().close_project()
         self.loaded_template_key=None
         self.analysis_report=None
+        if hasattr(self, "point_prediction"): self.point_prediction.clear()
         if hasattr(self, "export_batch_button"): self.export_batch_button.setEnabled(False)
         if hasattr(self,"home_summary"):self.home_summary.setText("请新建或打开项目。")
         for name in ("template_view", "conditions", "plot_ranges", "plot_variables", "analysis_output", "plot_image"):
@@ -340,16 +372,52 @@ class PythonWindow(MainWindow):
 
     def copy_conditions(self):
         project = self.require_project()
-        row = self.table.currentRow()
-        if row < 0:
-            raise ValidationError("请先在实验记录页选择一行")
+        rows = sorted(index.row() for index in self.table.selectionModel().selectedRows())
+        if len(rows) > 1:
+            return self.copy_point_conditions()
+        if not rows:
+            raise ValidationError("请先在实验记录页选择一行或多行")
+        row = rows[0]
         eid = int(self.table.item(row, 0).text())
         self.conditions.setPlainText(json.dumps(project.experiment(eid)["actual"], ensure_ascii=False, indent=2))
+        self.prediction_tabs.setCurrentWidget(self.single_prediction_page)
+
+    def copy_point_conditions(self):
+        project = self.require_project()
+        if self.analysis_task:
+            raise ValidationError("请先等待或取消当前预测，再复制实验条件")
+        rows = sorted(index.row() for index in self.table.selectionModel().selectedRows())
+        if not rows:
+            raise ValidationError("请先在实验记录页用 Ctrl 或 Shift 选择一个或多个实验")
+        points = []
+        with project.transaction():
+            template, revision = project.template, project.revision
+            for row in rows:
+                eid = int(self.table.item(row, 0).text())
+                record = project.experiment(eid)
+                try:
+                    condition = template.validate_conditions(record["actual"], execution=False)
+                except ValidationError as exc:
+                    raise ValidationError(f"来源实验 {eid} 的条件不可用于当前模板预测：{exc}") from exc
+                points.append({"conditions": condition, "source": {"experiment_id": eid,
+                               "record_uid": record.get("record_uid"), "copied_revision": revision}})
+        self.point_prediction.set_points(points)
+        self.go_to(3)
+        self.prediction_tabs.setCurrentWidget(self.point_prediction)
+        self.statusBar().showMessage(f"已复制 {len(points)} 个实验点到批量预测", 5000)
+
+    def start_point_prediction(self):
+        project = self.require_project()
+        request = self.point_prediction.request(project.template)
+        request.update(model=self.model.currentData(), seed=self.seed.value())
+        self.start_analysis_task(project, request, "points")
+
+    def update_prediction_model_hint(self, *_):
+        self.point_prediction.model_hint.setText(f"当前模型：{self.model.currentText()}；随机种子：{self.seed.value()}。可在“下一批实验”中更改。")
 
     def start_analysis(self):
-        from experiment_planner.worker.process import CalculationTask
         project = self.require_project()
-        condition = project.template.validate_conditions(self.conditions.values())
+        condition = project.template.validate_conditions(self.conditions.values(), execution=False)
         request = {"conditions": [condition], "model": self.model.currentData(), "seed": self.seed.value()}
         variables = [v.strip() for v in self.plot_variables.text().split(",") if v.strip()]
         if variables:
@@ -360,25 +428,44 @@ class PythonWindow(MainWindow):
             if not path:
                 return
             request.update(plot_path=path, variables=variables, metric=self.plot_metric.text().strip(), plot_ranges=ranges)
-        self.analysis_template = project.template
-        self.analysis_report = None
-        self.analysis_task = CalculationTask(project, request, operation="analyze")
+        self.start_analysis_task(project, request, "single")
+
+    def start_analysis_task(self, project, request, kind):
+        from experiment_planner.worker.process import CalculationTask
+        if self.analysis_task:
+            raise ValidationError("请先等待或取消当前预测")
+        task = CalculationTask(project, request, operation="analyze")
+        self.analysis_kind = kind
+        self.active_analysis_template = project.template
+        if kind == "single": self.analysis_template = self.active_analysis_template
+        self.analysis_task = task
         self.analyze_button.setEnabled(False)
-        self.analysis_output.setPlainText("正在本地拟合与预测；区间表示潜在响应，不包含未知的未来量测误差。")
-        self.plot_image.clear()
+        self.point_prediction.set_busy(True)
+        if kind == "points":
+            self.point_prediction.reset_result()
+            self.point_prediction.output.setPlainText(f"正在拟合所选模型并批量预测 {len(request['conditions'])} 个实验点；可取消。")
+        else:
+            self.analysis_report = None
+            self.analysis_output.setPlainText("正在本地拟合与预测；区间表示潜在响应，不包含未知的未来量测误差。")
+            self.plot_image.clear()
         self.analysis_timer.start()
 
     def poll_analysis(self):
         result = self.poll_calculation("analysis_task", self.analysis_timer, self.analyze_button)
         if result is None:
             return
+        self.point_prediction.set_busy(False)
         if "error" in result:
-            self.analysis_output.setPlainText(result["error"] + "\n点击窗口顶部“查看原始诊断”可重新查看本次失败详情。")
-            self.show_failure(result["error"], result.get("diagnostic"), "预测 / 绘图未完成")
+            output = self.point_prediction.output if self.analysis_kind == "points" else self.analysis_output
+            output.setPlainText(result["error"] + "\n点击窗口顶部“查看原始诊断”可重新查看本次失败详情。")
+            self.show_failure(result["error"], result.get("diagnostic"), "批量实验点预测未完成" if self.analysis_kind == "points" else "预测 / 绘图未完成")
             return
         self.guard(lambda: self.display_analysis(result["result"]))
 
     def display_analysis(self, report):
+        if self.analysis_kind == "points":
+            self.point_prediction.display_report(report, self.active_analysis_template, self.require_project().revision)
+            return
         self.analysis_report=report
         message = analysis_text(report,self.analysis_template)
         if report["revision"] != self.require_project().revision:
@@ -392,9 +479,13 @@ class PythonWindow(MainWindow):
         if getattr(self, "analysis_task", None):
             self.analysis_task.cancel()
             self.analysis_task = None
+            if self.analysis_kind == "points":
+                self.point_prediction.output.setPlainText("批量预测已取消，尚无可导出的新结果。可重新点击批量预测。")
         if hasattr(self, "analysis_timer"):
             self.analysis_timer.stop()
             self.analyze_button.setEnabled(True)
+        if hasattr(self, "point_prediction"):
+            self.point_prediction.set_busy(False)
 
     def cancel(self):
         self.cancel_analysis()

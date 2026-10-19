@@ -1,0 +1,318 @@
+{
+  "project_name": "合成多点预测示例",
+  "revision": 4,
+  "template_version": 1,
+  "model": "gp_rbf_v1",
+  "seed": 0,
+  "conditions": [
+    {
+      "time_s": 1.25
+    },
+    {
+      "time_s": 3.5
+    },
+    {
+      "time_s": 9.25
+    }
+  ],
+  "notices": [
+    "各基础响应条件独立；同一响应保留候选点间相关性",
+    "区间表示潜在响应，不包含未提供的未来测量误差",
+    "result: 已提供观测方差 u²"
+  ],
+  "model_datasets": {
+    "result": {
+      "count": 4,
+      "features": [
+        "time_s"
+      ],
+      "feature_ranges": {
+        "time_s": {
+          "unique_count": 4,
+          "min": 1.25,
+          "max": 9.25
+        }
+      },
+      "conditions": [
+        {
+          "time_s": 1.25
+        },
+        {
+          "time_s": 3.5
+        },
+        {
+          "time_s": 6.75
+        },
+        {
+          "time_s": 9.25
+        }
+      ],
+      "gp_training": {
+        "context": {
+          "response": "result",
+          "label": "测量结果",
+          "unit": "nm",
+          "model": "gp_rbf_v1",
+          "seed": 0,
+          "sample_count": 4,
+          "experiment_ids": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "encoded_dimensions": 1,
+          "unique_model_conditions": 4,
+          "inputs": [
+            {
+              "name": "time_s",
+              "label": "处理时间",
+              "unique_count": 4,
+              "encoded": {
+                "count": 4,
+                "nonfinite_count": 0,
+                "min": 0.125,
+                "max": 0.925
+              },
+              "observed_min": 1.25,
+              "observed_max": 9.25,
+              "allowed_bounds": [
+                0,
+                10
+              ],
+              "outside_experiment_ids": [],
+              "boundary_count": 0
+            }
+          ],
+          "response_values": {
+            "count": 4,
+            "nonfinite_count": 0,
+            "min": 10.1,
+            "max": 23.3
+          },
+          "residual_after_fixed_trend": {
+            "count": 4,
+            "nonfinite_count": 0,
+            "min": 10.1,
+            "max": 23.3
+          },
+          "noise_mode": "fixed_observation_variance",
+          "observation_variance_original_units": {
+            "count": 4,
+            "nonfinite_count": 0,
+            "min": 0.09,
+            "max": 0.09
+          },
+          "duplicate_condition_groups": [],
+          "duplicate_group_count": 0,
+          "dependency_versions": {
+            "botorch": "0.18.1",
+            "gpytorch": "1.15.2",
+            "torch": "2.8.0+cpu",
+            "scipy": "1.18.1"
+          },
+          "enabled_priors": []
+        },
+        "attempts": [
+          {
+            "attempt": 1,
+            "optimizer": "L-BFGS-B",
+            "maxiter": 100,
+            "maxls": 20,
+            "initialization": "library_default",
+            "lengthscale_spread_multiplier": null,
+            "initial_lengthscale": [
+              0.6931471805599453
+            ],
+            "optimizer_result": {
+              "status": "SUCCESS",
+              "message": "CONVERGENCE: NORM OF PROJECTED GRADIENT <= PGTOL",
+              "iterations": 11,
+              "objective": 1.2750974241444357
+            },
+            "outcome": "accepted",
+            "posterior_check": "finite_at_training_points",
+            "warnings": [],
+            "botorch_logs": []
+          }
+        ],
+        "recovered": false
+      }
+    }
+  },
+  "predictions": [
+    {
+      "result": {
+        "mean": 10.109324504117684,
+        "quantiles": [
+          9.509158164827035,
+          10.108952798189048,
+          10.681189335833086
+        ],
+        "sample_count": 512,
+        "finite_sample_count": 512,
+        "nonfinite_sample_count": 0,
+        "nonfinite_counts": {
+          "nan": 0,
+          "positive_infinity": 0,
+          "negative_infinity": 0
+        },
+        "summary_status": "ok",
+        "summary_notice": "",
+        "interval_kind": "latent_response",
+        "source": "joint_posterior_samples",
+        "moment_notice": ""
+      },
+      "feasibility_probability": 1.0,
+      "samples": 512,
+      "seed": 0,
+      "objective_predictions": [
+        {
+          "mean": 10.109324504117684,
+          "quantiles": [
+            9.509158164827035,
+            10.108952798189048,
+            10.681189335833086
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "definition": {
+            "direction": "maximize",
+            "metric": "result"
+          },
+          "ratio_policy": "remove",
+          "notice": ""
+        }
+      ]
+    },
+    {
+      "result": {
+        "mean": 14.222436318204325,
+        "quantiles": [
+          13.63338514754742,
+          14.215952903523512,
+          14.815091537404887
+        ],
+        "sample_count": 512,
+        "finite_sample_count": 512,
+        "nonfinite_sample_count": 0,
+        "nonfinite_counts": {
+          "nan": 0,
+          "positive_infinity": 0,
+          "negative_infinity": 0
+        },
+        "summary_status": "ok",
+        "summary_notice": "",
+        "interval_kind": "latent_response",
+        "source": "joint_posterior_samples",
+        "moment_notice": ""
+      },
+      "feasibility_probability": 1.0,
+      "samples": 512,
+      "seed": 0,
+      "objective_predictions": [
+        {
+          "mean": 14.222436318204325,
+          "quantiles": [
+            13.63338514754742,
+            14.215952903523512,
+            14.815091537404887
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "definition": {
+            "direction": "maximize",
+            "metric": "result"
+          },
+          "ratio_policy": "remove",
+          "notice": ""
+        }
+      ]
+    },
+    {
+      "result": {
+        "mean": 23.28875952339007,
+        "quantiles": [
+          22.752318883845938,
+          23.287523397648393,
+          23.85330112258358
+        ],
+        "sample_count": 512,
+        "finite_sample_count": 512,
+        "nonfinite_sample_count": 0,
+        "nonfinite_counts": {
+          "nan": 0,
+          "positive_infinity": 0,
+          "negative_infinity": 0
+        },
+        "summary_status": "ok",
+        "summary_notice": "",
+        "interval_kind": "latent_response",
+        "source": "joint_posterior_samples",
+        "moment_notice": ""
+      },
+      "feasibility_probability": 1.0,
+      "samples": 512,
+      "seed": 0,
+      "objective_predictions": [
+        {
+          "mean": 23.28875952339007,
+          "quantiles": [
+            22.752318883845938,
+            23.287523397648393,
+            23.85330112258358
+          ],
+          "sample_count": 512,
+          "finite_sample_count": 512,
+          "nonfinite_sample_count": 0,
+          "nonfinite_counts": {
+            "nan": 0,
+            "positive_infinity": 0,
+            "negative_infinity": 0
+          },
+          "summary_status": "ok",
+          "summary_notice": "",
+          "definition": {
+            "direction": "maximize",
+            "metric": "result"
+          },
+          "ratio_policy": "remove",
+          "notice": ""
+        }
+      ]
+    }
+  ],
+  "source_experiments": [
+    {
+      "experiment_id": 1,
+      "record_uid": "f4e2db3a-4055-487f-bfe5-4b55dd9193e3",
+      "copied_revision": 4
+    },
+    {
+      "experiment_id": 2,
+      "record_uid": "018e8ae8-feec-426c-a122-f29c001ff76e",
+      "copied_revision": 4
+    },
+    {
+      "experiment_id": 4,
+      "record_uid": "47d1e0b7-82ff-453f-a4a6-55286a3aaad4",
+      "copied_revision": 4
+    }
+  ]
+}

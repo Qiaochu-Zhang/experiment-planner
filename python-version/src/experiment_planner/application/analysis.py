@@ -1,4 +1,6 @@
 """Read-only prediction and plotting from an immutable project snapshot."""
+from copy import deepcopy
+
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.template import Template
 
@@ -13,7 +15,19 @@ def analyze(snapshot, request):
     conditions = request.get("conditions")
     if not isinstance(conditions, list) or not conditions:
         raise ValidationError("预测需要至少一组完整条件")
-    conditions = [template.validate_conditions(c) for c in conditions]
+    validated = []
+    for index, condition in enumerate(conditions, 1):
+        try:
+            validated.append(template.validate_conditions(condition, execution=False))
+        except ValidationError as exc:
+            raise ValidationError(f"预测点 {index}：{exc}") from exc
+    conditions = validated
+    sources = request.get("source_experiments")
+    if sources is not None:
+        if (not isinstance(sources, list) or len(sources) != len(conditions)
+                or any(not isinstance(s, dict) or type(s.get("experiment_id")) is not int
+                       or s["experiment_id"] < 1 for s in sources)):
+            raise ValidationError("来源实验必须与预测条件逐行对应，并包含有效实验编号")
     preset = request.get("model", "gp_rbf_v1")
     seed = request.get("seed", 0)
     if request.get("plot_path"):
@@ -24,9 +38,11 @@ def analyze(snapshot, request):
         template, snapshot["experiments"], preset, seed
     )
     result = {
+        "project_name": snapshot.get("name", ""),
         "revision": snapshot["revision"],
         "template_version": template.data["template_version"],
         "model": preset,
+        "seed": seed,
         "conditions": conditions,
         "notices": notices,
         "model_datasets": datasets,
@@ -34,6 +50,8 @@ def analyze(snapshot, request):
             model, encoder, names, template, conditions, seed=seed
         ),
     }
+    if sources is not None:
+        result["source_experiments"] = deepcopy(sources)
     from experiment_planner.domain.input_uncertainty import uncertainty_info, INPUT_UNCERTAINTY_NOTICE
     info = uncertainty_info(template)
     if info:

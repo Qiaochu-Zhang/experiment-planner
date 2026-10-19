@@ -1,5 +1,24 @@
 # Python 源码版验证报告
 
+## 实验点批量预测与 Excel 导出 · 2026-10-19
+
+在 `python-version/.venv` 的 Linux / Python 3.12.3 / Qt offscreen 环境，完成计算与存储回归 **416 项，全部通过，0 失败、0 错误、0 跳过，退出码 0**，173.77 秒：[日志](evidence/point-prediction-2026-10-19/core-tests.txt)、[JUnit](evidence/point-prediction-2026-10-19/core-tests.xml)。覆盖全部单元与集成测试。
+
+新增 **31 项测试**（20 项计算/导出、11 项界面），首次专项运行全部通过。GP/RBF、GP/Matérn、贝叶斯线性分别在输入不确定度开/关下验证：一次拟合、多个精确条件（含不在执行网格的历史实际值）、重复条件保留、逐点后验结果与 Excel 数值一致，且未调用绘图函数。还检查完整条件的数值/固定/类别/是否/文字类型、Excel 字面文本、均值与区间不可用时留空并保留原因、非法来源映射在拟合前拒绝。
+
+界面检查包含记录页/批量页/原复制按钮三个入口、多选顺序、待做条件、模型与种子、无绘图保存弹窗、取消与失败诊断、修改/删除/复用来源编号后的快照导出、取消导出、移除/替换/清空及项目切换。真实 spawn 进程通过按钮启动 GP 批量计算，完成轮询、逐点展示与 Excel 导出，项目快照保持不变。
+
+已查看[多选实验](evidence/point-prediction-2026-10-19/selected-records.png)、[批量预测结果](evidence/point-prediction-2026-10-19/batch-prediction.png)与[150% 字体](evidence/point-prediction-2026-10-19/batch-prediction-font150.png)截图。1024×650 和 1440×900 窗口中预测、导出、详情按钮均可滚动到达；150% 字体下导出按钮可达且文字高度充足。[合成 Excel 示例](evidence/point-prediction-2026-10-19/synthetic-predictions.xlsx)含来源实验 1、2、4 的三个条件及预测，[数值报告](evidence/point-prediction-2026-10-19/synthetic-report.json)与[环境记录](evidence/point-prediction-2026-10-19/environment.json)一并保存。
+
+复现分组命令（在 `python-version/` 内）：
+
+```bash
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/unit tests/integration -q -p no:cacheprovider
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/gui -vv -p no:cacheprovider
+```
+
+此前单次合并运行以 **143** 退出，未生成完整 pytest 总结，具体终止原因未确认；[保留的输出](evidence/point-prediction-2026-10-19/full-tests-interrupted.txt)未作为完整通过依据。初步 38 项相关回归与新增 31 项专项均通过，重复用例不累计为新测试。本轮未做 Windows 实机或真实机台数据验证，不以历史点预测或合成检查证明真实预测准确度。
+
 ## 下一批实验覆盖所选变量 · 2026-10-14
 
 在 `python-version/.venv` 的 Linux / Python 3.12.3 / Qt offscreen 环境完成 **231 项相关测试，全部通过，0 失败、0 跳过，退出码 0**，其中新增 **46 项**。运行耗时 91.94 秒，保留 21 条依赖弃用、矩阵 jitter 及合成输出约束提示：[日志](evidence/batch-coverage-2026-10-14/tests.txt)、[JUnit](evidence/batch-coverage-2026-10-14/tests.xml)。

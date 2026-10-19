@@ -1,10 +1,10 @@
 """Export saved recommendations, without refitting or reading edited conditions."""
 import json
-import math
 from pathlib import Path
 
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.template import Template
+from experiment_planner.io.prediction_export import prediction_rows, write_sheet
 
 
 ARRANGEMENTS = {"new": "常规优化", "exploration": "专门探索", "repeat": "复测",
@@ -13,88 +13,6 @@ ARRANGEMENTS = {"new": "常规优化", "exploration": "专门探索", "repeat": 
 
 def _json(value):
     return json.dumps(value, ensure_ascii=False, allow_nan=False)
-
-
-def _field(template, name):
-    fields = {f["name"]: f for f in template.fields}
-    if name in fields:
-        return fields[name]
-    policy = template.data.get("ratio_policy", {})
-    if name in ("raw_selectivity", "raw_selectivity_abs", policy.get("stable_metric_name")):
-        original = fields.get(policy.get("original_metric"), {})
-        prefix = "稳定化：" if name == policy.get("stable_metric_name") else "原始比值："
-        return {**original, "label": prefix + original.get("label", name)}
-    return {}
-
-
-def _statistics(item):
-    q = item.get("quantiles")
-    valid = (isinstance(q, (list, tuple)) and len(q) == 3
-             and all(type(v) in (float, int) and math.isfinite(v) for v in q))
-    mean = item.get("mean")
-    mean = mean if type(mean) in (float, int) and math.isfinite(mean) else None
-    notice = "；".join(dict.fromkeys(filter(None, (item.get("moment_notice"),
-                         item.get("notice"), item.get("summary_notice")))))
-    if not valid:
-        q = [None, None, None]
-        notice = "；".join(filter(None, [notice, "预测区间不可用"]))
-    return {"预测均值": mean, "预测中位数50%": q[1], "下限2.5%": q[0], "上限97.5%": q[2],
-            "预测状态": "区间不可用" if not valid else "仅有限样本" if item.get("nonfinite_sample_count", 0) else "可用",
-            "区间类型": item.get("interval_kind"), "总样本数": item.get("sample_count"),
-            "有限样本数": item.get("finite_sample_count"), "非有限样本数": item.get("nonfinite_sample_count"),
-            "说明": notice}
-
-
-def _prediction_rows(prediction, template):
-    variants = [("输入确定", prediction)]
-    if "nominal_prediction" in prediction:
-        variants = [("输入确定", prediction["nominal_prediction"]), ("含输入执行波动", prediction)]
-    for interpretation, variant in variants:
-        common = {"计算口径": interpretation, "预测可行概率": variant.get("feasibility_probability"),
-                  "随机种子": variant.get("seed")}
-        for name, item in variant.items():
-            if not isinstance(item, dict) or "quantiles" not in item:
-                continue
-            field = _field(template, name)
-            yield {**common, "结果类别": "响应/指标", "指标": name,
-                   "指标名称": field.get("label", name), "单位": field.get("unit", "1"),
-                   "目标变换": None, "目标方向": None, "目标定义": None,
-                   **_statistics(item), "公式": item.get("expression")}
-        for index, item in enumerate(variant.get("objective_predictions", []), 1):
-            definition = item.get("definition", {})
-            name = definition.get("metric", "")
-            field = _field(template, name)
-            stats = _statistics(item)
-            stats["区间类型"] = ("latent_response_with_input_uncertainty" if interpretation == "含输入执行波动"
-                                 else "latent_response")
-            yield {**common, "结果类别": f"目标{index}", "指标": name,
-                   "指标名称": field.get("label", name), "单位": field.get("unit", "1"),
-                   "目标变换": definition.get("transform", "identity"),
-                   "目标方向": definition.get("direction"), "目标定义": _json(definition),
-                   **stats, "公式": item.get("expression")}
-
-
-def _sheet(workbook, title, rows, headers=None):
-    from openpyxl.styles import Alignment, Font, PatternFill
-    from openpyxl.utils import get_column_letter
-    headers = headers or list(dict.fromkeys(key for row in rows for key in row))
-    sheet = workbook.create_sheet(title)
-    sheet.append(headers)
-    for row in rows:
-        sheet.append([row.get(key) for key in headers])
-    for cells in sheet:
-        for cell in cells:
-            if isinstance(cell.value, str): cell.data_type = "s"
-    for cell in sheet[1]:
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="245978")
-        cell.alignment = Alignment(wrap_text=True, vertical="top")
-    sheet.row_dimensions[1].height = 60
-    sheet.freeze_panes = "A2"
-    sheet.auto_filter.ref = sheet.dimensions
-    for i, header in enumerate(headers, 1):
-        sheet.column_dimensions[get_column_letter(i)].width = min(44, max(18, len(header) * 1.6))
-    return sheet
 
 
 def export_batch(project, path, *, batch_id=None):
@@ -135,7 +53,7 @@ def export_batch(project, path, *, batch_id=None):
                "计算口径": "含输入执行波动" if "nominal_prediction" in prediction else "输入确定" if prediction else None,
                "预测可行概率": prediction.get("feasibility_probability"),
                "相对基准变化": _json(candidate.get("changes", {}))}
-        for detail in _prediction_rows(prediction, template):
+        for detail in prediction_rows(prediction, template):
             predictions.append({**common, **detail})
             # Wide execution sheet: the primary prediction, including transformed objectives.
             if detail["计算口径"] == row["计算口径"]:
@@ -178,10 +96,10 @@ def export_batch(project, path, *, batch_id=None):
     workbook = Workbook()
     workbook.remove(workbook.active)
     try:
-        _sheet(workbook, "推荐实验", overview)
-        _sheet(workbook, "预测明细", predictions)
-        _sheet(workbook, "字段说明", definitions)
-        _sheet(workbook, "批次说明", [{"项目": key, "内容": value} for key, value in metadata])
+        write_sheet(workbook, "推荐实验", overview)
+        write_sheet(workbook, "预测明细", predictions)
+        write_sheet(workbook, "字段说明", definitions)
+        write_sheet(workbook, "批次说明", [{"项目": key, "内容": value} for key, value in metadata])
         workbook.save(path)
     finally:
         workbook.close()
