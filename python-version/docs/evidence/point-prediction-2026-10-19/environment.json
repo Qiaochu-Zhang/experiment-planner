@@ -45,5 +45,14 @@
     "tests": 38,
     "failures": 0,
     "seconds": 134.27
-  }
+  },
+  "gui_tests": {
+    "tests": 121,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 895.194,
+    "exit_code": 0
+  },
+  "total_distinct_tests": 537
 }
