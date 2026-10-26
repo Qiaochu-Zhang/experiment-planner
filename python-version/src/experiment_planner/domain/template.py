@@ -178,6 +178,8 @@ class Template:
                     raise ValidationError("线性约束仅支持数值输入")
         from experiment_planner.domain.input_uncertainty import validate_input_uncertainty
         validate_input_uncertainty(self)
+        from experiment_planner.domain.reliability import validate_weighting
+        validate_weighting(d.get("data_weighting", {}))
 
     def _validate_parameter(self, field, value, execution=True):
         value = parse_value(value, field)

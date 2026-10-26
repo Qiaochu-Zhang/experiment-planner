@@ -1,0 +1,382 @@
+{
+  "revision": 18,
+  "template_version": 2,
+  "model": "bayesian_linear_v1",
+  "seed": 7,
+  "repeats": 8,
+  "ranking": [
+    {
+      "parameter": "temperature",
+      "label": "温度",
+      "score": 99.59093563505327
+    },
+    {
+      "parameter": "route",
+      "label": "处理路线",
+      "score": 0.2765026311028784
+    },
+    {
+      "parameter": "duration",
+      "label": "反应时间",
+      "score": 0.13256173384385084
+    }
+  ],
+  "responses": [
+    {
+      "response": "quality",
+      "count": 16,
+      "analyzed_count": 16,
+      "informative": true,
+      "parameters": [
+        {
+          "parameter": "temperature",
+          "label": "温度",
+          "unique_count": 4,
+          "score": 99.59093563505327,
+          "sensitivity": 155.4672879804089,
+          "valid_permutations": 128,
+          "changed_permutations": 97,
+          "reason": "已估计"
+        },
+        {
+          "parameter": "duration",
+          "label": "反应时间",
+          "unique_count": 2,
+          "score": 0.13256173384385084,
+          "sensitivity": 0.20693663654496758,
+          "valid_permutations": 128,
+          "changed_permutations": 70,
+          "reason": "已估计"
+        },
+        {
+          "parameter": "route",
+          "label": "处理路线",
+          "unique_count": 2,
+          "score": 0.2765026311028784,
+          "sensitivity": 0.4316368141628512,
+          "valid_permutations": 128,
+          "changed_permutations": 54,
+          "reason": "已估计"
+        }
+      ],
+      "center": "后验均值"
+    }
+  ],
+  "unavailable_responses": [],
+  "model_datasets": {
+    "quality": {
+      "count": 16,
+      "features": [
+        "temperature",
+        "duration",
+        "route"
+      ],
+      "feature_ranges": {
+        "temperature": {
+          "unique_count": 4,
+          "min": 20.0,
+          "max": 80.0
+        },
+        "duration": {
+          "unique_count": 2,
+          "min": 20.0,
+          "max": 80.0
+        },
+        "route": {
+          "unique_count": 2
+        }
+      },
+      "conditions": [
+        {
+          "duration": 20.0,
+          "route": "甲",
+          "temperature": 20.0
+        },
+        {
+          "duration": 20.0,
+          "route": "乙",
+          "temperature": 20.0
+        },
+        {
+          "duration": 80.0,
+          "route": "甲",
+          "temperature": 20.0
+        },
+        {
+          "duration": 80.0,
+          "route": "乙",
+          "temperature": 20.0
+        },
+        {
+          "duration": 20.0,
+          "route": "甲",
+          "temperature": 40.0
+        },
+        {
+          "duration": 20.0,
+          "route": "乙",
+          "temperature": 40.0
+        },
+        {
+          "duration": 80.0,
+          "route": "甲",
+          "temperature": 40.0
+        },
+        {
+          "duration": 80.0,
+          "route": "乙",
+          "temperature": 40.0
+        },
+        {
+          "duration": 20.0,
+          "route": "甲",
+          "temperature": 60.0
+        },
+        {
+          "duration": 20.0,
+          "route": "乙",
+          "temperature": 60.0
+        },
+        {
+          "duration": 80.0,
+          "route": "甲",
+          "temperature": 60.0
+        },
+        {
+          "duration": 80.0,
+          "route": "乙",
+          "temperature": 60.0
+        },
+        {
+          "duration": 20.0,
+          "route": "甲",
+          "temperature": 80.0
+        },
+        {
+          "duration": 20.0,
+          "route": "乙",
+          "temperature": 80.0
+        },
+        {
+          "duration": 80.0,
+          "route": "甲",
+          "temperature": 80.0
+        },
+        {
+          "duration": 80.0,
+          "route": "乙",
+          "temperature": 80.0
+        }
+      ],
+      "experiment_ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "data_weighting": {
+        "recency_half_life_days": 180,
+        "reference_time": "2026-10-01T00:00:00+00:00",
+        "minimum_weight": 1e-06,
+        "records": [
+          {
+            "experiment_id": 1,
+            "batch": "早期批次",
+            "confidence": 0.6,
+            "performed_at": "2026-01-01T00:00:00+00:00",
+            "age_days": 273.0,
+            "weight": 0.20969549012685293,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 2,
+            "batch": "早期批次",
+            "confidence": 0.6,
+            "performed_at": "2026-01-01T00:00:00+00:00",
+            "age_days": 273.0,
+            "weight": 0.20969549012685293,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 3,
+            "batch": "早期批次",
+            "confidence": 0.6,
+            "performed_at": "2026-01-01T00:00:00+00:00",
+            "age_days": 273.0,
+            "weight": 0.20969549012685293,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 4,
+            "batch": "早期批次",
+            "confidence": 0.6,
+            "performed_at": "2026-01-01T00:00:00+00:00",
+            "age_days": 273.0,
+            "weight": 0.20969549012685293,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 5,
+            "batch": "早期批次",
+            "confidence": 0.6,
+            "performed_at": "2026-01-01T00:00:00+00:00",
+            "age_days": 273.0,
+            "weight": 0.20969549012685293,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 6,
+            "batch": "早期批次",
+            "confidence": 0.6,
+            "performed_at": "2026-01-01T00:00:00+00:00",
+            "age_days": 273.0,
+            "weight": 0.20969549012685293,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 7,
+            "batch": "早期批次",
+            "confidence": 0.6,
+            "performed_at": "2026-01-01T00:00:00+00:00",
+            "age_days": 273.0,
+            "weight": 0.20969549012685293,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 8,
+            "batch": "早期批次",
+            "confidence": 0.6,
+            "performed_at": "2026-01-01T00:00:00+00:00",
+            "age_days": 273.0,
+            "weight": 0.20969549012685293,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 9,
+            "batch": "近期批次",
+            "confidence": 1.0,
+            "performed_at": "2026-10-01T00:00:00+00:00",
+            "age_days": 0.0,
+            "weight": 1.0,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 10,
+            "batch": "近期批次",
+            "confidence": 1.0,
+            "performed_at": "2026-10-01T00:00:00+00:00",
+            "age_days": 0.0,
+            "weight": 1.0,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 11,
+            "batch": "近期批次",
+            "confidence": 1.0,
+            "performed_at": "2026-10-01T00:00:00+00:00",
+            "age_days": 0.0,
+            "weight": 1.0,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 12,
+            "batch": "近期批次",
+            "confidence": 1.0,
+            "performed_at": "2026-10-01T00:00:00+00:00",
+            "age_days": 0.0,
+            "weight": 1.0,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 13,
+            "batch": "近期批次",
+            "confidence": 1.0,
+            "performed_at": "2026-10-01T00:00:00+00:00",
+            "age_days": 0.0,
+            "weight": 1.0,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 14,
+            "batch": "近期批次",
+            "confidence": 1.0,
+            "performed_at": "2026-10-01T00:00:00+00:00",
+            "age_days": 0.0,
+            "weight": 1.0,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 15,
+            "batch": "近期批次",
+            "confidence": 1.0,
+            "performed_at": "2026-10-01T00:00:00+00:00",
+            "age_days": 0.0,
+            "weight": 1.0,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          },
+          {
+            "experiment_id": 16,
+            "batch": "近期批次",
+            "confidence": 1.0,
+            "performed_at": "2026-10-01T00:00:00+00:00",
+            "age_days": 0.0,
+            "weight": 1.0,
+            "weight_floor_applied": false,
+            "legacy_time": false,
+            "unknown_time": false
+          }
+        ]
+      }
+    }
+  },
+  "notices": [
+    "重要度是当前模型在历史取值范围内的置换敏感度，相对分数合计 100；不是因果效应、准确率或独立验证结果。数据量、相关条件、先验及模型选择会影响排名。",
+    "综合分数对可排名的基础响应等权平均，不按优化目标权重；只在满足输入约束的置换条件上计算，最多抽取 256 条历史条件。",
+    "本分析使用历史实际输入的确定位置，不叠加未来输入执行波动。",
+    "各基础响应条件独立；同一响应保留候选点间相关性",
+    "区间表示潜在响应，不包含未提供的未来测量误差",
+    "响应质量：已应用批次可信度 / 近期权重（0.2097–1）；相对建模权重不代表准确率。"
+  ]
+}

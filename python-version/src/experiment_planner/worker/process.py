@@ -14,6 +14,9 @@ def _run(connection, snapshot, request, operation):
             if operation == "analyze":
                 from experiment_planner.application.analysis import analyze
                 result = analyze(snapshot, request)
+            elif operation == "importance":
+                from experiment_planner.application.importance import analyze_importance
+                result = analyze_importance(snapshot, request)
             else:
                 from experiment_planner.engine.planner import generate
                 result = generate(snapshot, request)
@@ -37,7 +40,7 @@ class CalculationTask:
     active = set()
 
     def __init__(self, project, request, operation="generate"):
-        if operation not in ("generate", "analyze"):
+        if operation not in ("generate", "analyze", "importance"):
             raise ValidationError("未知计算操作")
         self.operation = operation
         self.key = str(project.path)

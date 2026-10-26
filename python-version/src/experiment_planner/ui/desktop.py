@@ -21,6 +21,7 @@ from experiment_planner.ui.template_editor import TemplateEditor
 from experiment_planner.ui.conditions import ConditionsForm
 from experiment_planner.ui.plot_ranges import PlotRangesForm
 from experiment_planner.ui.point_prediction import PointPredictionPanel
+from experiment_planner.ui.data_quality import ExperimentBatchDialog, DataWeightingDialog, ImportancePanel
 from experiment_planner.ui.help import attach_help, help_label, show_help
 from experiment_planner.ui.tree_editor import chinese_buttons
 from experiment_planner.ui.messages import analysis_text
@@ -162,9 +163,19 @@ class PythonWindow(MainWindow):
         self.seed.valueChanged.connect(self.update_prediction_model_hint)
         self.update_prediction_model_hint()
         self.prediction_tabs.addTab(self.point_prediction, "批量实验点预测")
+        self.importance = ImportancePanel()
+        self.importance.run_requested.connect(lambda:self.guard(self.start_importance))
+        self.importance.cancel_requested.connect(self.cancel_analysis)
+        self.importance.export_requested.connect(lambda:self.guard(self.export_importance_data))
+        self.prediction_tabs.addTab(self.importance, "实验条件重要度")
         self.tabs.addTab(self.prediction_tabs, "预测 / 趋势图")
         record_actions = self.tabs.widget(0).layout().itemAt(0).layout()
         self.copy_points_button = button("复制所选条件到批量预测", lambda:self.guard(self.copy_point_conditions), record_actions)
+        quality_actions = QHBoxLayout(); self.tabs.widget(0).layout().insertLayout(1, quality_actions)
+        self.batch_button = button("设置所选实验批次 / 日期", lambda:self.guard(self.assign_experiment_batch), quality_actions)
+        self.weighting_button = button("批次可信度 / 近期权重", lambda:self.guard(self.edit_data_weighting), quality_actions)
+        button("导出实验记录", lambda:self.guard(self.export_data), quality_actions)
+        self.bulk_update_button = button("导入 Excel / CSV 批量修改", lambda:self.guard(lambda:self.import_data("update")), quality_actions)
         self.build_workspace()
         project_actions = QHBoxLayout()
         self.centralWidget().layout().insertLayout(1, project_actions)
@@ -277,6 +288,7 @@ class PythonWindow(MainWindow):
 
     def refresh(self):
         selected_baseline=self.baseline.currentData()
+        selected_model, selected_seed = self.model.currentData(), self.seed.value()
         super().refresh()
         project = self.require_project()
         if hasattr(self, "export_batch_button"):
@@ -300,9 +312,14 @@ class PythonWindow(MainWindow):
                     for p in template.parameters:box.addItem(p.get("label",p["name"]),p["name"])
                     box.setCurrentIndex(min(index,box.count()-1))
                 defaults=template.data.get("batch_defaults",{})
+                model_defaults = (str(project.path), template.data["optimization"].get("default_model_preset", "gp_rbf_v1"), defaults.get("seed", 0))
+                keep_model_settings = getattr(self, "loaded_model_defaults", None) == model_defaults
                 self.n.setValue(defaults.get("total_count",6));self.exploration_strength.setValue(defaults.get("exploration_strength",0));self.exploration_count.setValue(defaults.get("exploration_count",0))
                 self.pool_size.setValue(defaults.get("pool_size",128));self.seed.setValue(defaults.get("seed",0))
                 self.model.setCurrentIndex(max(0,self.model.findData(template.data["optimization"].get("default_model_preset","gp_rbf_v1"))))
+                if keep_model_settings:
+                    self.model.setCurrentIndex(max(0, self.model.findData(selected_model))); self.seed.setValue(selected_seed)
+                self.loaded_model_defaults = model_defaults
                 self.mode.setCurrentIndex(max(0,self.mode.findData(defaults.get("search_mode","full_space"))))
                 self.baseline.setCurrentIndex(max(0,self.baseline.findData(defaults.get("baseline_experiment_id"))))
                 self.variables.setText(",".join(defaults.get("changed_parameter_names",[])))
@@ -319,6 +336,7 @@ class PythonWindow(MainWindow):
             self.template_view.setPlainText(f"模板：{template.data.get('name','')}\n版本：{template.data['template_version']}\n\n当前目标：\n{goals}\n\n先验关系：{len(template.data.get('knowledge_priors',[]))} 条\n\n所有设置均可通过“编辑项目模板”修改；全部属性使用树形表单。旧项目目标保留原定义。")
             if hasattr(self,"home_summary"):self.home_summary.setText(self.summary.text()+"\n\n"+goals)
             self.point_prediction.mark_revision(project.revision)
+            self.importance.mark_stale(project.revision)
 
     def close_project(self):
         if self.service and isinstance(self.service.project, ProjectSession) and self.service.project.dirty:
@@ -331,8 +349,10 @@ class PythonWindow(MainWindow):
                     QMessageBox.warning(self, "项目未保存", user_error(exc)); return False
         super().close_project()
         self.loaded_template_key=None
+        self.loaded_model_defaults=None
         self.analysis_report=None
         if hasattr(self, "point_prediction"): self.point_prediction.clear()
+        if hasattr(self, "importance"): self.importance.clear()
         if hasattr(self, "export_batch_button"): self.export_batch_button.setEnabled(False)
         if hasattr(self,"home_summary"):self.home_summary.setText("请新建或打开项目。")
         for name in ("template_view", "conditions", "plot_ranges", "plot_variables", "analysis_output", "plot_image"):
@@ -430,18 +450,54 @@ class PythonWindow(MainWindow):
             request.update(plot_path=path, variables=variables, metric=self.plot_metric.text().strip(), plot_ranges=ranges)
         self.start_analysis_task(project, request, "single")
 
+    def assign_experiment_batch(self):
+        project = self.require_project()
+        ids = [int(self.table.item(row.row(), 0).text()) for row in self.table.selectionModel().selectedRows()]
+        if not ids: raise ValidationError("请先在实验记录中用 Ctrl / Shift 选择要设置批次的实验")
+        revision = project.revision
+        dialog = ExperimentBatchDialog(project.template, project.experiments(), ids, self)
+        if dialog.exec():
+            self.service.assign_experiment_batch(**dialog.values(), expected_revision=revision); self.refresh()
+            self.statusBar().showMessage("已设置所选实验批次 / 日期；Ctrl+Z 撤销，Ctrl+S 保存项目。", 12000)
+
+    def edit_data_weighting(self):
+        project = self.require_project()
+        revision = project.revision
+        dialog = DataWeightingDialog(project.template, project.experiments(), self)
+        if dialog.exec():
+            if project.revision != revision:
+                raise ValidationError("项目已修改，请重新打开可信度设置以使用最新批次")
+            self.service.update_template(project.template.revised(data_weighting=dialog.values())); self.refresh()
+            self.statusBar().showMessage("可信度 / 近期权重已应用；下一次预测、推荐及重要度分析使用新设置。Ctrl+S 保存项目。", 15000)
+
+    def start_importance(self):
+        project = self.require_project()
+        self.start_analysis_task(project, {"model": self.model.currentData(), "seed": self.seed.value()}, "importance")
+
+    def export_importance_data(self):
+        if not self.importance.report: raise ValidationError("请先完成实验条件重要度分析")
+        path, _ = QFileDialog.getSaveFileName(self, "导出实验条件重要度", "实验条件重要度.xlsx", "Excel (*.xlsx);;CSV (*.csv)")
+        if path:
+            from experiment_planner.io.exchange import export_importance
+            export_importance(self.importance.report, self.importance_template, path)
+
     def start_analysis_task(self, project, request, kind):
         from experiment_planner.worker.process import CalculationTask
         if self.analysis_task:
             raise ValidationError("请先等待或取消当前预测")
-        task = CalculationTask(project, request, operation="analyze")
+        task = CalculationTask(project, request, operation="importance" if kind == "importance" else "analyze")
         self.analysis_kind = kind
         self.active_analysis_template = project.template
         if kind == "single": self.analysis_template = self.active_analysis_template
         self.analysis_task = task
         self.analyze_button.setEnabled(False)
         self.point_prediction.set_busy(True)
-        if kind == "points":
+        self.importance.set_busy(True)
+        if kind == "importance":
+            self.importance.clear(); self.importance.set_busy(True)
+            self.importance_template = self.active_analysis_template
+            self.importance.output.setPlainText("正在根据有效实测数据拟合模型并估算条件重要度；可取消。")
+        elif kind == "points":
             self.point_prediction.reset_result()
             self.point_prediction.output.setPlainText(f"正在拟合所选模型并批量预测 {len(request['conditions'])} 个实验点；可取消。")
         else:
@@ -455,14 +511,19 @@ class PythonWindow(MainWindow):
         if result is None:
             return
         self.point_prediction.set_busy(False)
+        self.importance.set_busy(False)
         if "error" in result:
-            output = self.point_prediction.output if self.analysis_kind == "points" else self.analysis_output
+            output = self.importance.output if self.analysis_kind == "importance" else self.point_prediction.output if self.analysis_kind == "points" else self.analysis_output
             output.setPlainText(result["error"] + "\n点击窗口顶部“查看原始诊断”可重新查看本次失败详情。")
-            self.show_failure(result["error"], result.get("diagnostic"), "批量实验点预测未完成" if self.analysis_kind == "points" else "预测 / 绘图未完成")
+            title = "实验条件重要度分析未完成" if self.analysis_kind == "importance" else "批量实验点预测未完成" if self.analysis_kind == "points" else "预测 / 绘图未完成"
+            self.show_failure(result["error"], result.get("diagnostic"), title)
             return
         self.guard(lambda: self.display_analysis(result["result"]))
 
     def display_analysis(self, report):
+        if self.analysis_kind == "importance":
+            self.importance.display_report(report, self.active_analysis_template, self.require_project().revision)
+            return
         if self.analysis_kind == "points":
             self.point_prediction.display_report(report, self.active_analysis_template, self.require_project().revision)
             return
@@ -481,17 +542,21 @@ class PythonWindow(MainWindow):
             self.analysis_task = None
             if self.analysis_kind == "points":
                 self.point_prediction.output.setPlainText("批量预测已取消，尚无可导出的新结果。可重新点击批量预测。")
+            elif self.analysis_kind == "importance":
+                self.importance.output.setPlainText("重要度分析已取消，可重新计算。")
         if hasattr(self, "analysis_timer"):
             self.analysis_timer.stop()
             self.analyze_button.setEnabled(True)
         if hasattr(self, "point_prediction"):
             self.point_prediction.set_busy(False)
+        if hasattr(self, "importance"):
+            self.importance.set_busy(False)
 
     def cancel(self):
         self.cancel_analysis()
         super().cancel()
 
-    def import_data(self):
+    def import_data(self, requested_mode=None):
         from experiment_planner.io.exchange import read_headers
         project=self.require_project()
         path,_=QFileDialog.getOpenFileName(self,"选择历史实验记录","","表格 (*.csv *.xlsx)")
@@ -499,10 +564,13 @@ class PythonWindow(MainWindow):
         headers=read_headers(path)
         dialog=QDialog(self);dialog.setWindowTitle("导入列对应关系与预览");dialog.resize(1050,750)
         layout=QVBoxLayout(dialog)
-        hint=QLabel("表头一致时保留自动识别；复测使用独立外部编号。按模板输入顺序，前 30%（向上取整）全空的行视为结束，该行及后续行不导入。")
+        mode = QComboBox(); mode.addItem("新增导入（按外部编号 / 内容去重）", "append"); mode.addItem("批量修改已有实验（使用导出文件的身份与版本）", "update")
+        mode.setCurrentIndex(1 if requested_mode == "update" or requested_mode is None and "record_token" in headers else 0)
+        layout.addWidget(mode)
+        hint=QLabel("表头一致时保留自动识别。批量修改请使用同一项目最新导出的记录，保留身份列、完整输入和原始测量列；测量留空将清除原值。新增复测使用独立外部编号。前 30% 输入全空的行仍作为结束标记。")
         hint.setWordWrap(True);layout.addWidget(hint)
         mapping_table=QTableWidget(len(headers),2);mapping_table.setHorizontalHeaderLabels(["文件中的列名","对应的程序字段"]);layout.addWidget(mapping_table)
-        choices=[("自动识别",None),("外部实验编号","external_id"),("实验状态","status"),("整组备注","note")]
+        choices=[("自动识别",None),("外部实验编号","external_id"),("实验状态","status"),("整组备注","note"), ("自定义实验批次", "experiment_batch"), ("实际实验日期", "performed_at")]
         for f in project.template.parameters+project.template.measurements:
             choices.append((f.get("label",f["name"]),f["name"]))
             for suffix,label in (("_uncertainty","误差大小"),("_uncertainty_kind","误差类型"),("_distribution","误差分布"),("_note","备注"),("_unit","单位"),("_confidence","置信水平"),("_coverage_factor","覆盖因子")):
@@ -522,10 +590,27 @@ class PythonWindow(MainWindow):
             nonlocal preview
             preview=None;buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(False)
             mapping={h:w.currentData() for h,w in zip(headers,editors) if w.currentData()}
-            preview=preview_import(self.service,path,mapping)
+            preview=preview_import(self.service,path,mapping,mode=mode.currentData())
             if preview.errors:output.setPlainText("\n".join(f"第 {e['row']} 行：{e['message']}" for e in preview.errors))
             else:
                 labels={f["name"]:f.get("label",f["name"]) for f in project.template.fields}
+                if preview.mode == "update":
+                    changed = [entry for entry in preview.changes if entry["changes"]]
+                    lines = [f"校验通过：将修改 {len(changed)} 条实验；{len(preview.records)-len(changed)} 条无变化；不新增实验。派生结果自动重算。"]
+                    for entry in changed:
+                        lines.append(f"\n实验 {entry['experiment_id']}：")
+                        for change in entry["changes"]:
+                            words = {"conditions": "实验条件", "observations": "原始测量", "status": "实验状态",
+                                     "note": "备注", "field_notes": "参数备注", "experiment_batch": "实验批次",
+                                     "performed_at": "实验日期", "value": "数值", "unit": "单位", "uncertainty": "误差",
+                                     "amount": "大小", "kind": "类型", "distribution": "分布", "source": "来源",
+                                     "coverage_factor": "覆盖因子", "confidence": "置信水平", "lower": "下界", "upper": "上界"}
+                            title = " / ".join(labels.get(part, words.get(part, part)) for part in change["field"].split("."))
+                            lines.append(f"{title}：{change['before']} → {change['after']}")
+                    output.setPlainText("\n".join(lines))
+                    if preview.stop_message: output.appendPlainText("\n" + preview.stop_message)
+                    buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(True)
+                    return
                 lines=[f"校验通过：{len(preview.records)} 条待导入记录（提交时按外部编号 / 内容去重）。"]
                 for i,record in enumerate(preview.records,1):
                     lines.append(f"\n第 {i} 条，外部编号：{record.get('external_id') or '未填'}")
@@ -537,8 +622,10 @@ class PythonWindow(MainWindow):
         def commit():
             if preview is None:raise ValidationError("请先校验并预览")
             ids=preview.commit(self.service);self.refresh();dialog.accept()
-            QMessageBox.information(self,"导入完成",f"新增 {len(ids)} 条实验；相同编号的相同记录已跳过。")
+            message = f"已批量修改 {len(ids)} 条实验；其余无变化，Ctrl+Z 可整批撤销。" if preview.mode == "update" else f"新增 {len(ids)} 条实验；相同编号的相同记录已跳过。"
+            QMessageBox.information(self,"导入完成",message + "\n桌面项目需 Ctrl+S 保存。")
         for w in editors:w.currentIndexChanged.connect(lambda _:buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(False))
+        mode.currentIndexChanged.connect(lambda _:buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(False))
         button("校验并预览",lambda:self.guard(refresh_preview),layout)
         buttons.accepted.connect(lambda:self.guard(commit));buttons.rejected.connect(dialog.reject)
         self.guard(refresh_preview);dialog.exec()
@@ -566,6 +653,8 @@ class PythonWindow(MainWindow):
             "record":("录入实验 / 复测结果",self.add_record,"允许相同条件保存不同测量结果"),
             "records":("查看与回填实验",lambda:self.go_to(0),"查看历史、选择待做记录回填"),
             "prediction":("预测与趋势图",lambda:self.go_to(3),"通过参数表单输入条件并预测"),
+            "importance":("实验条件重要度",lambda:(self.go_to(3),self.prediction_tabs.setCurrentWidget(self.importance)),"根据已有实测数据估算条件相对重要度"),
+            "data_weighting":("批次可信度 / 近期权重",self.edit_data_weighting,"设置批次权重与近期实验半衰期"),
             "import":("导入 CSV / Excel",self.import_data,"匹配列、校验预览后保存"),
             "import_template":("下载导入 CSV / Excel 模板",self.download_import_template,"按当前实验模板生成空白导入表"),
             "export":("导出实验记录",self.export_data,"导出完整精度数据"),

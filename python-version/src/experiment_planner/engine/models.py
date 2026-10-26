@@ -11,6 +11,8 @@ from gpytorch.kernels import RBFKernel, MaternKernel, ScaleKernel
 from experiment_planner.domain.errors import CapabilityError, ValidationError
 from experiment_planner.knowledge.priors import check_capabilities
 from experiment_planner.engine.gp_fitting import fit_gp, training_context
+from experiment_planner.domain.reliability import data_weights
+from experiment_planner.engine.reliability import weighted_gaussian_likelihood
 
 DTYPE = torch.double
 
@@ -71,13 +73,14 @@ class BayesianLinear(Model):
 
 
 class BernoulliLogit(BayesianLinear):
-    def __init__(self, X, y):
+    def __init__(self, X, y, weights=None):
         Model.__init__(self)
         phi = torch.cat([torch.ones_like(X[..., :1]), X], -1)
         beta = torch.zeros(phi.shape[-1], dtype=DTYPE, requires_grad=True)
         optimizer = torch.optim.LBFGS([beta], max_iter=70, line_search_fn="strong_wolfe")
         def loss_at(b):
-            return torch.nn.functional.binary_cross_entropy_with_logits(phi @ b, y.reshape(-1), reduction="sum") + b.square().sum() / 2
+            losses = torch.nn.functional.binary_cross_entropy_with_logits(phi @ b, y.reshape(-1), reduction="none")
+            return (losses if weights is None else losses * weights.reshape(-1)).sum() + b.square().sum() / 2
         def closure():
             optimizer.zero_grad()
             loss = loss_at(beta)
@@ -115,13 +118,15 @@ class ProjectedModel(Model):
         return posterior_transform(result) if posterior_transform else result
 
 
-def fit_models(template, experiments, preset, seed=0):
+def fit_models(template, experiments, preset, seed=0, *, response_names=None):
     check_capabilities(template, preset)
+    responses = [r for r in template.responses if response_names is None or r["name"] in response_names]
+    if not responses: raise CapabilityError("没有可拟合的基础响应")
     source_usage={}
     def raw_dependencies(name):
         if name not in template.graph.formulas:return {name}
         return set().union(*(raw_dependencies(dep) for dep in template.graph.formulas[name].dependencies))
-    for response in template.responses:
+    for response in responses:
         for experiment in experiments:
             if experiment["status"] not in ("completed","partial"):continue
             for name in raw_dependencies(response["name"]):
@@ -133,10 +138,10 @@ def fit_models(template, experiments, preset, seed=0):
     torch.manual_seed(seed)
     encoder = Encoder(template)
     models, names, notices, datasets = [], [], [], {}
-    for response in template.responses:
+    for response in responses:
         name = response["name"]
         boolean = response.get("value_type") == "bool"
-        records, record_ids = [], []
+        records, record_ids, source_records = [], [], []
         fitting = None
         for row_number, e in enumerate(experiments, 1):
             if e["status"] not in ("completed", "partial"): continue
@@ -149,6 +154,7 @@ def fit_models(template, experiments, preset, seed=0):
                 standard = Uncertainty(**u).standard()
             records.append((e["actual"], float(cell["value"]), standard))
             record_ids.append(e.get("id", f"输入第 {row_number} 行（无实验编号）"))
+            source_records.append(e)
         if len(records) < 2:
             raise CapabilityError(f"{name}：有效数据不足两条，预测尚不可用")
         X = encoder.encode([r[0] for r in records])
@@ -163,6 +169,19 @@ def fit_models(template, experiments, preset, seed=0):
                 "可在“实验记录 → 统一设置误差”中按量测依据或明确假设补齐未知误差；"
                 "派生响应需补齐相关原始测量的误差。")
         variance = torch.tensor([r[2] for r in records], dtype=DTYPE).unsqueeze(-1).square() if all(known) else None
+        raw_weights, weighting = data_weights(template, source_records)
+        weights = torch.tensor(raw_weights, dtype=DTYPE).unsqueeze(-1)
+        weighted = any(w != 1. for w in raw_weights)
+        if weighted:
+            notices.append(f"{response.get('label', name)}：已应用批次可信度 / 近期权重（{min(raw_weights):.5g}–{max(raw_weights):.5g}）；相对建模权重不代表准确率。")
+        if any(d["legacy_time"] for d in weighting["records"]):
+            notices.append(f"{name}：旧记录以原保存时间近似实验日期；可在批次设置或 Excel 中补正实际日期。")
+        if any(d["unknown_time"] for d in weighting["records"]):
+            notices.append(f"{name}：部分实验日期未知，未对这些记录施加时间衰减；请补充实际日期。")
+        if any(d["weight_floor_applied"] for d in weighting["records"]):
+            notices.append(f"{name}：极低权重已按数值下限 1e-6 处理，详见技术详情。")
+        if weighted and variance is not None:
+            variance = variance.clamp_min(1e-8) / weights
         priors = [p for p in template.data.get("knowledge_priors", []) if p.get("enabled", True) and p["response"] == name]
         excluded = {i for p in priors if p["relation"] == "independent" for i in encoder.indices.get(p["input"], [])}
         active = [i for i in range(encoder.width) if i not in excluded]
@@ -190,7 +209,7 @@ def fit_models(template, experiments, preset, seed=0):
                 trend[index+1] += scaled * p["strength"] / (1 + p["strength"])
                 trend[0] += coefficient * lo * p["strength"] / (1 + p["strength"])
         if boolean:
-            inner = BernoulliLogit(reduced, y)
+            inner = BernoulliLogit(reduced, y, weights if weighted else None)
             notices.append(f"{name}: Bernoulli-logit / Laplace；概率是参数后验采样统计")
         elif preset == "bayesian_linear_v1":
             if variance is None:
@@ -203,7 +222,7 @@ def fit_models(template, experiments, preset, seed=0):
                 rank = int(least_squares.rank.item())
                 mse = (y - phi @ beta).square().sum() / max(1, len(y)-rank)
                 noise = max(mse.item(), y.var().item() * .01, 1e-6)
-                variance = torch.full_like(y, noise)
+                variance = torch.full_like(y, noise) / weights if weighted else torch.full_like(y, noise)
                 notices.append(f"{name}: 未提供误差；经验残差方差={noise:.8g}，少数据时有局限")
             inner = BayesianLinear(reduced, y, variance, prior_mean, prior_precision)
         else:
@@ -212,10 +231,12 @@ def fit_models(template, experiments, preset, seed=0):
             context = training_context(response, preset, seed, encoder, active, records,
                                        record_ids, X, y, residual, variance)
             context["enabled_priors"] = [{k: p[k] for k in ("input", "relation", "coefficient", "strength") if k in p} for p in priors]
+            context["data_weighting"] = weighting
 
             def factory():
                 kernel = kernel_cls(ard_num_dims=reduced.shape[-1], **({"nu": 2.5} if kernel_cls is MaternKernel else {}))
-                return SingleTaskGP(reduced, residual, train_Yvar=variance, covar_module=ScaleKernel(kernel))
+                likelihood = weighted_gaussian_likelihood(weights) if weighted and variance is None else None
+                return SingleTaskGP(reduced, residual, train_Yvar=variance, likelihood=likelihood, covar_module=ScaleKernel(kernel))
 
             inner, fitting = fit_gp(factory, reduced, residual, variance, context)
             notices.append(f"{name}: {'已提供观测方差 u²' if variance is not None else 'GP 估计未知噪声'}")
@@ -238,6 +259,8 @@ def fit_models(template, experiments, preset, seed=0):
             if unique == 1:
                 notices.append(f"{response.get('label', name)}：有效训练记录中的 {field.get('label', field['name'])} 只有一个取值；无法从这些数据识别其影响，平坦预测不代表物理无关")
         datasets[name] = {"count": len(records), "features": [p["name"] for p in encoder.fields if any(i in active for i in encoder.indices[p["name"]])], "feature_ranges": feature_ranges, "conditions": [r[0] for r in records]}
+        datasets[name]["experiment_ids"] = record_ids
+        datasets[name]["data_weighting"] = weighting
         if fitting is not None:
             datasets[name]["gp_training"] = fitting
 

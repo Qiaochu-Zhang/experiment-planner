@@ -1,13 +1,18 @@
 import csv
+import copy
+import hashlib
 import json
 import math
 from contextlib import closing
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from experiment_planner.application.records import normalize_observations
+from experiment_planner.metrics.uncertainty import Uncertainty
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.template import parse_value
+from experiment_planner.domain.reliability import batch_name, experiment_time, record_time
+from experiment_planner.storage.project import encode
 from experiment_planner.io.excel_guidance import (
     ExcelGuide, add_column_hints, add_value_validation, column_cells,
     has_hint_row, value_hint,
@@ -21,6 +26,8 @@ class ImportPreview:
     errors: list = field(default_factory=list)
     stop_row: int | None = None
     stop_fields: list = field(default_factory=list)
+    mode: str = "append"
+    changes: list = field(default_factory=list)
 
     @property
     def stop_message(self):
@@ -29,7 +36,40 @@ class ImportPreview:
 
     def commit(self, service):
         if self.errors: raise ValidationError("请先修复导入预览中的错误")
+        if self.mode == "update": return service.update_records(self.records, self.revision)
         return service.import_records(self.records, self.revision)
+
+
+def record_token(record):
+    return hashlib.sha256(encode(record).encode("utf-8")).hexdigest()
+
+
+def editable_record(record):
+    """Canonical editable values; ignore import provenance and empty optional cells."""
+    cells = {}
+    for name, cell in record["observations"].items():
+        value = {k: copy.deepcopy(cell.get(k)) for k in ("value", "unit", "note", "uncertainty")}
+        value["uncertainty"] = asdict(Uncertainty(**(value["uncertainty"] or {})))
+        value["note"] = value["note"] or ""
+        if value["value"] is None and not value["note"] and (value["uncertainty"] or {}).get("kind", "unspecified") == "unspecified":
+            continue
+        cells[name] = value
+    return {"conditions": record["actual"], "observations": cells,
+            "status": record["status"], "note": record.get("note", ""),
+            "field_notes": {n: v for n, v in record.get("field_notes", {}).items() if v},
+            "experiment_batch": record.get("experiment_batch", ""), "performed_at": record_time(record)}
+
+
+def record_changes(before, after, prefix=""):
+    changes = []
+    for key in sorted(set(before) | set(after)):
+        old, new = before.get(key), after.get(key)
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(old, dict) and isinstance(new, dict):
+            changes.extend(record_changes(old, new, path))
+        elif old != new:
+            changes.append({"field": path, "before": old, "after": new})
+    return changes
 
 
 def missing(value):
@@ -98,9 +138,12 @@ def read_rows(path):
         return [row for _, row in rows]
 
 
-def preview_import(service, path, mapping=None):
+def preview_import(service, path, mapping=None, *, mode="append"):
+    if mode not in ("append", "update"): raise ValidationError("请选择新增导入或批量修改")
     t = service.project.template
-    preview = ImportPreview(service.project.revision)
+    preview = ImportPreview(service.project.revision, mode=mode)
+    project_uid = service.project.db.execute("SELECT uuid FROM project WHERE id=1").fetchone()[0]
+    seen = set()
     fields = t.parameters + t.measurements
     aliases = {f.get("label", f["name"]): f["name"] for f in fields}
     aliases.update({f["name"]: f["name"] for f in fields})
@@ -121,8 +164,15 @@ def preview_import(service, path, mapping=None):
             preview.errors.append({"row": heading_row, "message": "多列映射到同一字段，请调整列对应关系"})
             return preview
         absent = [name for name in first_inputs if name not in mapped.values()]
+        if mode == "update":
+            required = ["experiment_id", "record_uid", "record_token", "project_uid", "status", "note",
+                        "experiment_batch", "performed_at", *[f["name"] for f in t.parameters + t.measurements],
+                        *[p["name"]+"_note" for p in t.parameters],
+                        *[f["name"]+suffix for f in t.measurements for suffix in
+                          ("_unit", "_note", "_uncertainty", "_uncertainty_kind", "_distribution", "_coverage_factor", "_confidence")]]
+            absent += [name for name in required if name not in mapped.values() and name not in absent]
         if absent:
-            preview.errors.append({"row": heading_row, "message": "用于结束判断的输入列未匹配：" + "、".join(absent)})
+            preview.errors.append({"row": heading_row, "message": ("批量修改缺少必要列，请使用本程序最新导出的记录：" if mode == "update" else "用于结束判断的输入列未匹配：") + "、".join(absent)})
             return preview
         for row_number, raw in rows:
             row = {mapped[k]: value for k, value in raw.items() if k in mapped}
@@ -131,18 +181,44 @@ def preview_import(service, path, mapping=None):
                 break
             try:
                 if None in raw: raise ValidationError("数据列数超过表头，请检查多余的分隔符或表头")
+                old = None
+                if mode == "update":
+                    eid_value = parse_value(row.get("experiment_id"), {"name": "experiment_id", "value_type": "int"})
+                    if eid_value is None or eid_value <= 0 or eid_value in seen:
+                        raise ValidationError("实验编号无效或重复；批量修改每条实验只能出现一次")
+                    seen.add(eid_value)
+                    old = service.project.experiment(eid_value)
+                    if (row.get("project_uid") != project_uid or (row.get("record_uid") or "") != old.get("record_uid", "")
+                            or row.get("record_token") != record_token(old)):
+                        raise ValidationError(f"实验 {eid_value} 身份或导出版本不匹配，请重新导出；请勿修改身份列或覆盖其他项目、已更正、已删除及编号复用的记录")
                 inputs = {p["name"]: parse_value(row.get(p["name"]), p) for p in t.parameters}
                 t.validate_conditions(inputs, execution=False)
                 measurements = {}
                 for f in t.measurements:
                     n = f["name"]
-                    uncertainty = {"kind": row.get(n+"_uncertainty_kind") or "unspecified", "distribution": row.get(n+"_distribution") or None}
+                    original = copy.deepcopy(old["observations"].get(n, {})) if old else {}
+                    uncertainty = copy.deepcopy(original.get("uncertainty") or {})
+                    if row.get(n+"_uncertainty_json"):
+                        uncertainty = json.loads(row[n+"_uncertainty_json"])
+                        if not isinstance(uncertainty, dict): raise ValidationError(f"{n} 的详细误差必须为 JSON 对象")
+                    uncertainty.update({"kind": row.get(n+"_uncertainty_kind") or "unspecified", "distribution": row.get(n+"_distribution") or None})
                     for suffix in ("amount", "coverage_factor", "confidence"):
                         value = row.get(n+("_uncertainty" if suffix == "amount" else "_"+suffix))
                         if value not in ("", None): uncertainty[suffix] = float(value)
-                    measurements[n] = {"value": row.get(n), "unit": row.get(n+"_unit") or f.get("unit", "1"), "note": row.get(n+"_note") or "", "uncertainty": uncertainty, "source_text": str(row.get(n, ""))}
-                normalize_observations(t, measurements)
-                preview.records.append({"conditions": inputs, "observations": measurements, "external_id": row.get("external_id") or row.get("experiment_id"), "note": row.get("note") or "", "status": row.get("status") or "completed", "field_notes": {p["name"]: row.get(p["name"]+"_note") or "" for p in t.parameters}})
+                        elif n+("_uncertainty" if suffix == "amount" else "_"+suffix) in row: uncertainty[suffix] = None
+                    measurements[n] = {**original, "value": row.get(n), "unit": row.get(n+"_unit") or f.get("unit", "1"), "note": row.get(n+"_note") or "", "uncertainty": uncertainty}
+                    if not old: measurements[n]["source_text"] = str(row.get(n, ""))
+                measurements = normalize_observations(t, measurements)
+                item = {"conditions": inputs, "observations": measurements, "external_id": row.get("external_id") or row.get("experiment_id"), "note": row.get("note") or "", "status": row.get("status") or "completed", "field_notes": {p["name"]: row.get(p["name"]+"_note") or "" for p in t.parameters},
+                        "experiment_batch": batch_name(row.get("experiment_batch")), "performed_at": experiment_time(row.get("performed_at"))}
+                if mode == "update":
+                    for key in ("project_uid", "record_token"): item[key] = row[key]
+                    item.update(experiment_id=eid_value, record_uid=row.get("record_uid") or "")
+                checked = service.prepare_record(inputs, measurements, **{k: item[k] for k in ("status", "note", "field_notes", "experiment_batch", "performed_at")})
+                if old:
+                    changes = record_changes(editable_record(old), editable_record(checked))
+                    preview.changes.append({"experiment_id": eid_value, "changes": changes})
+                preview.records.append(item)
             except (ValueError, TypeError) as exc:
                 preview.errors.append({"row": row_number, "message": str(exc)})
     return preview
@@ -154,8 +230,11 @@ def export_records(project, path):
         path.write_text(json.dumps(project.snapshot(), ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
         return
     rows = []
+    project_uid = project.db.execute("SELECT uuid FROM project WHERE id=1").fetchone()[0]
     for e in project.experiments():
-        row = {"experiment_id": e["id"], "status": e["status"], "note": e["note"], **e["actual"]}
+        row = {"experiment_id": e["id"], "record_uid": e.get("record_uid", ""), "project_uid": project_uid,
+               "record_token": record_token(e), "status": e["status"], "note": e["note"],
+               "experiment_batch": e.get("experiment_batch", ""), "performed_at": record_time(e), **e["actual"]}
         for name, note in e.get("field_notes", {}).items(): row[name+"_note"] = note
         for n, c in e["observations"].items():
             u = c.get("uncertainty") or {}
@@ -164,7 +243,12 @@ def export_records(project, path):
         row["suggested_json"] = json.dumps(e.get("suggested"), ensure_ascii=False)
         row["prediction_json"] = json.dumps(e.get("prediction"), ensure_ascii=False)
         rows.append(row)
-    headers = list(dict.fromkeys(["experiment_id", "status", "note", *(p["name"] for p in project.template.parameters), *(k for r in rows for k in r)]))
+    headers = list(dict.fromkeys(["experiment_id", "record_uid", "project_uid", "record_token", "status", "note", "experiment_batch", "performed_at",
+        *(p["name"] for p in project.template.parameters), *(p["name"]+"_note" for p in project.template.parameters),
+        *(f["name"] for f in project.template.measurements),
+        *(f["name"]+suffix for f in project.template.measurements for suffix in
+          ("_unit", "_note", "_uncertainty", "_uncertainty_kind", "_distribution", "_coverage_factor", "_confidence", "_uncertainty_json")),
+        *(k for r in rows for k in r)]))
     if path.suffix.lower() == ".csv":
         with path.open("w", encoding="utf-8-sig", newline="") as target:
             writer = csv.DictWriter(target, fieldnames=headers)
@@ -181,6 +265,20 @@ def export_records(project, path):
             # Notes and external text are literal text, never spreadsheet formula code.
             for cell in sheet[sheet.max_row]:
                 if isinstance(cell.value, str): cell.data_type = "s"
+        guide = wb.create_sheet("批量修改说明")
+        for values in [
+            ["操作", "修改“实验记录”页后，在同一项目中导入并选择“批量修改已有实验”，核对逐项预览再保存。"],
+            ["身份列", "experiment_id、record_uid、project_uid、record_token 请勿修改。记录更改、删除或编号复用后须重新导出。"],
+            ["可修改", "输入条件、原始测量及误差、各备注、status、experiment_batch（自定义批次）、performed_at（实验日期）。"],
+            ["留空", "已有测量留空表示清除；全部输入必须完整。保留列名，删除不需修改的整行可以只更新部分记录。"],
+            ["实验日期", "填写 YYYY-MM-DD 或 ISO 日期时间；无时区按 UTC。完成/部分结果日期留空采用本次录入时间。"],
+            ["批次可信度", "在软件“批次可信度 / 近期权重”中设置。未设置的批次默认 1。"],
+            ["只读结果", "派生值由原始测量重算；prediction_json、suggested_json 仅供查看，修改它们不改变模型预测。"],
+            ["误差详情", "常规误差列优先；uncertainty_json 保留相关来源及非对称界限等详细信息，通常无需改动。"],
+        ]: guide.append(values)
+        guide.column_dimensions["A"].width = 20; guide.column_dimensions["B"].width = 110
+        sheet.freeze_panes = "E2"; sheet.auto_filter.ref = sheet.dimensions
+        wb.active = 0
         wb.save(path)
         wb.close()
     else: raise ValidationError("导出支持 CSV / XLSX / JSON")
@@ -208,9 +306,25 @@ def write_table(path, headers, rows, title):
         raise ValidationError("请选择 CSV 或 Excel (.xlsx)")
 
 
+def export_importance(report, template, path):
+    labels = {f["name"]: f.get("label", f["name"]) for f in template.fields}
+    rows = []
+    for ranked in report["ranking"]:
+        for response in report["responses"]:
+            item = next(row for row in response["parameters"] if row["parameter"] == ranked["parameter"])
+            rows.append({"参数": ranked["parameter"], "参数名称": ranked["label"], "综合重要度": ranked["score"],
+                         "响应": response["response"], "响应名称": labels.get(response["response"], response["response"]),
+                         "响应重要度": item["score"], "敏感度原值": item["sensitivity"], "说明": item["reason"],
+                         "训练条数": response["count"], "分析条数": response["analyzed_count"],
+                         "数据版本": report["revision"], "模型": report["model"], "置换次数": report["repeats"],
+                         "解释": " ".join(report["notices"][:3])})
+    headers = list(rows[0]) if rows else ["参数", "综合重要度"]
+    write_table(path, headers, rows, "实验条件重要度")
+
+
 def export_import_template(template, path):
     """An empty input file with visible Excel hints and cell validation."""
-    headers = ["external_id", "status", "note"]
+    headers = ["external_id", "status", "note", "experiment_batch", "performed_at"]
     for field in template.parameters:
         headers.extend([field["name"], field["name"] + "_note"])
     for field in template.measurements:
@@ -249,6 +363,8 @@ def _guide_import_sheet(workbook, template, headers):
         "external_id": "选填：外部实验编号。复测使用不同编号；已有编号用于重复导入检查。",
         "status": "选填：从下拉选择状态；留空默认为 completed（已完成）。",
         "note": "选填：整条实验备注。",
+        "experiment_batch": "选填：自定义实验批次名称。同名批次共用在软件设置的可信度，未设置为 1。",
+        "performed_at": "选填：实际实验日期 YYYY-MM-DD 或 ISO 日期时间；完成/部分结果留空采用录入时间，无时区按 UTC。",
     }
     choices = {"status": ["completed", "partial", "pending", "running", "failed", "cancelled"]}
     numeric = {}

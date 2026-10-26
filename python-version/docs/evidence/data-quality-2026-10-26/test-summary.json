@@ -1,0 +1,52 @@
+{
+  "unique_tests": 582,
+  "core_tests": 449,
+  "gui_tests": 133,
+  "new_tests": 45,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "reports": [
+    {
+      "report": "core-tests.xml",
+      "tests": 449,
+      "seconds": 154.149,
+      "exit_code": 0
+    },
+    {
+      "report": "gui-preview-tests.xml",
+      "tests": 1,
+      "seconds": 2.972,
+      "exit_code": 0
+    },
+    {
+      "report": "gui-records-tests.xml",
+      "tests": 42,
+      "seconds": 341.53,
+      "exit_code": 0
+    },
+    {
+      "report": "gui-stale-settings-tests.xml",
+      "tests": 1,
+      "seconds": 2.783,
+      "exit_code": 0
+    },
+    {
+      "report": "gui-uncertainty-tests.xml",
+      "tests": 42,
+      "seconds": 43.944,
+      "exit_code": 0
+    },
+    {
+      "report": "gui-workflow-tests.xml",
+      "tests": 48,
+      "seconds": 301.843,
+      "exit_code": 0
+    }
+  ],
+  "initial_full_gui_run": {
+    "exit_code": 143,
+    "complete": false,
+    "used_as_pass_evidence": false
+  }
+}

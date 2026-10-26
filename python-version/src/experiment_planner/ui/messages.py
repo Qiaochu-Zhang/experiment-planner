@@ -72,6 +72,31 @@ def formatted(value, name, template):
     return display(value, digits) if digits is not None else f"{value:.5g}"
 
 
+def record_result_text(record, field, template):
+    """Render saved recommendation predictions without fitting or inventing measurements."""
+    name = field["name"]
+    cell = record.get("observations", {}).get(name, record.get("derived", {}).get(name, {}))
+    if cell.get("value") is not None:
+        return display(cell["value"], field.get("display_digits"))
+    prediction = record.get("prediction") or {}
+    if not prediction or record.get("status") not in ("pending", "running", "partial"):
+        return "未测"
+    snapshot = record.get("prediction_conditions") or record.get("suggested")
+    if snapshot is not None and snapshot != record["actual"]:
+        return "未测（条件已改，原预测不适用）"
+    item = prediction.get(name)
+    if not isinstance(item, dict): return "未测"
+    value, kind = item.get("mean"), "均值"
+    if type(value) not in (int, float) or not math.isfinite(value):
+        q = item.get("quantiles")
+        value = q[1] if isinstance(q, (list, tuple)) and len(q) == 3 else None
+        kind = "中位数"
+    if type(value) not in (int, float) or not math.isfinite(value):
+        return "未测（预测不可用）"
+    suffix = "；有限样本" if item.get("nonfinite_sample_count") else ""
+    return f"未测（预测{kind} {formatted(value, name, template)}{suffix}）"
+
+
 def _interval_lines(item, name, label, template, *, objective=False):
     """An unavailable interval must not prevent other predictions being shown."""
     prefix = f"  {label}：" if objective else f"{label}："

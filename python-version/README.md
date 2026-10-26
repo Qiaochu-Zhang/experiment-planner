@@ -38,6 +38,14 @@ Excel 的布尔类型统一显示“是否”，取值下拉只显示“是 / �
 
 ## 导入与日常操作
 
+**条件重要度、实验批次与可信度**：在“实验记录”多选后点击“设置所选实验批次 / 日期”，填写批次名称、相对可信度及可选的实际实验日期。“批次可信度 / 近期权重”可集中调整各批次权重，并设置近期权重半衰期（天）：0 默认关闭，30 表示比最新有效实验早 30 天的记录时间权重为 0.5。批次未设置时可信度为 1；同名批次共用设置，新推荐自动归入“推荐批次 N”。设置用于后续预测、趋势图、推荐及重要度分析，支持撤销并需 Ctrl+S 保存。可信度是相对训练权重，不是准确率百分比。
+
+进入“预测 / 趋势图 → 实验条件重要度”，按“下一批实验”选择的模型及种子分析已有实测数据，显示各参数的综合分数与逐响应分数，可导出 Excel/CSV。分数采用历史范围内的模型置换敏感度，相对合计 100；数据未变化、未进入模型或约束不允许单独变化的条件显示无法估计。它不代表因果效应或独立验证准确度。
+
+**Excel / CSV 批量修改**：在“实验记录”导出文件，修改条件、原始测量、误差、备注、状态、`experiment_batch` 或 `performed_at`，再点击“导入 Excel / CSV 批量修改”。普通导入入口遇到新版导出文件也会预选批量修改模式；核对逐项变化后保存。身份与版本列须保留，已有测量留空表示清除，派生结果自动重算；无变化行跳过，不新增实验。可只保留待修改的行，整批可撤销。过期文件、其他项目和编号复用会被拒绝，需重新导出。旧版无身份列文件仍可新增导入，批量更正请先重新导出。
+
+待做 / 进行中及部分结果中的未测响应现显示为“未测（预测均值 …）”，没有适用均值时显示预测中位数；读取推荐时保存的快照，不重新拟合、不写成实测值。修改条件后提示原预测不适用；初始化或没有该响应预测时保持“未测”。日期、权重含义和完整操作见 [回答第 67 节](回答.md)。
+
 常用页默认有“导入 CSV / Excel”。核对列映射后，程序按**模板输入参数顺序**检查前 30%（向上取整，至少一项）：这些值全部为空时，该行为结束标记，该行及后续行不导入。例如 8 个输入检查前 3 个，11 个输入检查前 4 个。
 
 0 和“否”不是空值。结束前的其他错误仍需修复。预览明确显示停止行、检查字段和待导入数量，确认后点击保存。文件表头缺少用于判断的输入列时会提示映射问题。内置示例文件位于 [导入示例](examples/import_templates/README.md)；自建模板可在“项目与模板 → 下载导入 CSV / Excel 模板”生成自己的空白输入表。Excel 第 1 行提示必填输入、单位和实际范围，第 2 行列名，第 3 行起填写；固定/离散/是否及状态/误差等列带下拉。仍支持旧版第 1 行列名的 Excel，CSV 格式不变。
@@ -81,7 +89,9 @@ python cli.py template local-data/project.sqlite
 python cli.py recommend local-data/project.sqlite examples/batch.json
 python cli.py predict local-data/project.sqlite examples/prediction.json
 python cli.py import local-data/project.sqlite records.xlsx --commit
+python cli.py import local-data/project.sqlite edited-records.xlsx --update --commit
 python cli.py export local-data/project.sqlite records.xlsx
+python cli.py importance local-data/project.sqlite --model gp_rbf_v1 --output importance.xlsx
 python cli.py backup local-data/project.sqlite backup.sqlite
 ```
 

@@ -6,6 +6,7 @@ from functools import wraps
 from experiment_planner.application.records import derive, normalize_observations
 from experiment_planner.application.measurement_uncertainty import plan_measurement_uncertainty
 from experiment_planner.domain.errors import ValidationError
+from experiment_planner.domain.reliability import batch_name, confidence_value, experiment_time, record_time
 from experiment_planner.storage.project import Project, encode, now
 
 
@@ -69,7 +70,8 @@ class PlannerService:
         self._restore(after, "redo")
         self._redo.pop(); self._undo.append((before, after))
 
-    def prepare_record(self, conditions, observations, *, status="completed", note="", field_notes=None, suggested=None):
+    def prepare_record(self, conditions, observations, *, status="completed", note="", field_notes=None,
+                       suggested=None, experiment_batch="", performed_at=None):
         if status not in ("pending", "running", "completed", "partial", "failed", "cancelled"):
             raise ValidationError("未知实验状态")
         t = self.project.template
@@ -78,7 +80,21 @@ class PlannerService:
         if suggested is not None: t.validate_conditions(suggested)
         return {"record_uid": str(uuid.uuid4()), "actual": actual, "suggested": suggested, "observations": cells,
                 "derived": derive(t, actual, cells), "status": status, "note": note,
+                "experiment_batch": batch_name(experiment_batch),
+                "performed_at": experiment_time(performed_at) or (now() if status in ("completed", "partial") else None),
                 "field_notes": field_notes or {}, "template_version": t.data["template_version"], "updated": now()}
+
+    def _revised_record(self, old, conditions, observations, **kwargs):
+        kwargs.setdefault("experiment_batch", old.get("experiment_batch", ""))
+        if "performed_at" not in kwargs:
+            kwargs["performed_at"] = record_time(old)
+        new = self.prepare_record(conditions, observations, suggested=old.get("suggested"), **kwargs)
+        for key in ("record_uid", "repeat_of_uid", "baseline_id_uid", "batch_id", "prediction", "arrangement", "changes", "repeat_of", "baseline_id", "cross_members", "prediction_conditions"):
+            if key in old: new[key] = old[key]
+        # Backfill a stable condition snapshot for older recommended records.
+        if old.get("prediction") and "prediction_conditions" not in new:
+            new["prediction_conditions"] = copy.deepcopy(old.get("suggested") or old["actual"])
+        return new
 
     @reversible
     def add_record(self, conditions, observations, **kwargs):
@@ -96,13 +112,78 @@ class PlannerService:
         p = self.project
         revision=self._action_revision
         old = p.experiment(experiment_id)
-        new = self.prepare_record(conditions, observations, suggested=old.get("suggested"), **kwargs)
-        for key in ("record_uid", "repeat_of_uid", "baseline_id_uid", "batch_id", "prediction", "arrangement", "changes", "repeat_of", "baseline_id", "cross_members"):
-            if key in old: new[key] = old[key]
+        new = self._revised_record(old, conditions, observations, **kwargs)
         with p.transaction(revision):
             p.db.execute("UPDATE experiments SET payload=? WHERE id=?", (encode(new), experiment_id))
             p.bump()
             p.log("experiment", experiment_id, old, new)
+
+    @reversible
+    def assign_experiment_batch(self, experiment_ids, name, *, confidence=None, performed_at=None, expected_revision=None):
+        if expected_revision is not None and expected_revision != self._action_revision:
+            from experiment_planner.domain.errors import StaleVersionError
+            raise StaleVersionError("项目已修改，请重新选择实验并设置批次")
+        ids = list(dict.fromkeys(experiment_ids))
+        if not ids or any(type(eid) is not int or eid <= 0 for eid in ids):
+            raise ValidationError("请选择至少一条实验记录以设置批次")
+        name = batch_name(name)
+        stamp = experiment_time(performed_at)
+        p = self.project
+        records = [p.experiment(eid) for eid in ids]
+        config = copy.deepcopy(p.template.data.get("data_weighting", {}))
+        if confidence is not None:
+            if not name: raise ValidationError("设置可信度前请填写批次名称")
+            config.setdefault("batch_confidence", {})[name] = confidence_value(confidence)
+        old_template = p.template
+        template_changed = config != old_template.data.get("data_weighting", {})
+        template = old_template.revised(data_weighting=config) if template_changed else old_template
+        changes = []
+        for old in records:
+            new = copy.deepcopy(old)
+            new["experiment_batch"] = name
+            if stamp is not None: new["performed_at"] = stamp
+            if new != old: changes.append((old, new))
+        if changes or template_changed: p.bump()
+        if template_changed:
+            p.db.execute("UPDATE project SET template=? WHERE id=1", (encode(template.data),))
+            p.log("data_weighting", 1, old_template.data, template.data)
+        for old, new in changes:
+            eid = new.pop("id")
+            new["updated"] = now()
+            # Assigning a batch must not make a legacy record look newly performed.
+            new.setdefault("performed_at", record_time(old))
+            p.db.execute("UPDATE experiments SET payload=? WHERE id=?", (encode(new), eid))
+            p.log("experiment_batch", eid, old, new)
+        return ids
+
+    @reversible
+    def update_records(self, records, expected_revision):
+        """Apply a reviewed exported table atomically, protecting identity and stale rows."""
+        from experiment_planner.io.exchange import record_token
+        p = self.project
+        prepared, seen = [], set()
+        with p.transaction(expected_revision):
+            project_uid = p.db.execute("SELECT uuid FROM project WHERE id=1").fetchone()[0]
+            for item in records:
+                eid = item.get("experiment_id")
+                if type(eid) is not int or eid <= 0 or eid in seen:
+                    raise ValidationError("批量修改的实验编号无效或重复")
+                seen.add(eid)
+                old = p.experiment(eid)
+                if (item.get("project_uid") != project_uid or item.get("record_uid") != old.get("record_uid", "")
+                        or item.get("record_token") != record_token(old)):
+                    raise ValidationError(f"实验 {eid} 的身份或导出版本不匹配，请重新导出最新记录；不能覆盖其他项目、已删除或编号复用的记录")
+                new = self._revised_record(old, item["conditions"], item["observations"],
+                    status=item["status"], note=item.get("note", ""), field_notes=item.get("field_notes"),
+                    experiment_batch=item.get("experiment_batch", ""), performed_at=item.get("performed_at"))
+                from experiment_planner.io.exchange import editable_record
+                if editable_record(old) != editable_record(new): prepared.append((eid, old, new))
+            if prepared:
+                p.bump()
+                for eid, old, new in prepared:
+                    p.db.execute("UPDATE experiments SET payload=? WHERE id=?", (encode(new), eid))
+                    p.log("bulk_update", eid, old, new)
+        return [eid for eid, _, _ in prepared]
 
     @reversible
     def set_measurement_uncertainty(self, experiment_ids, measurement_names, amount, *,
@@ -120,7 +201,8 @@ class PlannerService:
                                              measurement_names, amount, kind=kind, only_unknown=only_unknown,
                                              trusted_experiment_ids=trusted_experiment_ids,
                                              trusted_factor=trusted_factor, reason=reason)
-            for _, new in plan.changes:
+            for old, new in plan.changes:
+                new.setdefault("performed_at", record_time(old))
                 new["derived"] = derive(template, new["actual"], new["observations"])
                 new["template_version"] = template.data["template_version"]
                 new["updated"] = now()
@@ -170,22 +252,24 @@ class PlannerService:
         p = self.project
         prepared = []
         for item in records:
-            record = self.prepare_record(item["conditions"], item["observations"], note=item.get("note", ""), field_notes=item.get("field_notes"), status=item.get("status", "completed"))
+            record = self.prepare_record(item["conditions"], item["observations"], note=item.get("note", ""), field_notes=item.get("field_notes"), status=item.get("status", "completed"), experiment_batch=item.get("experiment_batch", ""), performed_at=item.get("performed_at"))
             identity = str(item["external_id"]) if item.get("external_id") is not None else None
             # Content fallback preserves actual inputs, never rounded modeling inputs.
             key = hashlib.sha256(encode({"external_id": identity} if identity else item).encode()).hexdigest()
-            prepared.append((key, record))
+            prepared.append((key, record, bool(item.get("performed_at"))))
         ids = []
         if expected_revision != self._action_revision:
             from experiment_planner.domain.errors import StaleVersionError
             raise StaleVersionError("项目已修改，请重新预览导入")
         with p.transaction(expected_revision):
-            for key, record in prepared:
+            for key, record, explicit_date in prepared:
                 existing = p.db.execute("SELECT id,payload FROM experiments WHERE import_key=?", (key,)).fetchone()
                 if existing:
                     prior = __import__("json").loads(existing[1])
                     for obj in (prior, record):
                         obj.pop("updated", None); obj.pop("record_uid", None); obj.pop("template_version", None)
+                        if not explicit_date: obj.pop("performed_at", None)
+                        obj.setdefault("experiment_batch", "")
                     if prior != record: raise ValidationError("同一外部实验编号内容冲突，请使用更正功能")
                     continue
                 cursor = p.insert_experiment(record, key)
@@ -233,7 +317,7 @@ class PlannerService:
             ids = []
             for candidate in saved_batch["candidates"]:
                 record = self.prepare_record(candidate["conditions"], {}, status="pending", suggested=candidate["conditions"])
-                record.update({"batch_id": bid, "prediction": candidate.get("prediction"), "arrangement": candidate.get("arrangement", "new"), "changes": candidate.get("changes", {})})
+                record.update({"batch_id": bid, "experiment_batch": f"推荐批次 {bid}", "prediction": candidate.get("prediction"), "prediction_conditions": copy.deepcopy(candidate["conditions"]), "arrangement": candidate.get("arrangement", "new"), "changes": candidate.get("changes", {})})
                 for name in ("repeat_of","baseline_id","cross_members"):
                     if name in candidate:record[name]=candidate[name]
                 for ref in ("repeat_of", "baseline_id"):

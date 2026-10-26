@@ -1,5 +1,28 @@
 # Python 源码版验证报告
 
+## 条件重要度、批次可信度、近期权重与批量更正 · 2026-10-26
+
+完成 **582 项不同测试，全部通过，0 失败、0 错误、0 跳过**：全部单元/集成 449 项、全部界面 133 项，包含新增 45 项（33 项核心、12 项界面）。分组进程退出码均为 0；重复专项检查不重复计数。环境为本目录独立 `.venv`、Linux / Python 3.12.3 / Qt offscreen。
+
+| 验证组 | 结果 | 证据 |
+| --- | --- | --- |
+| 全部单元与集成 | 449 passed，154.19 秒，退出码 0 | [JUnit](evidence/data-quality-2026-10-26/core-tests.xml) |
+| 记录、批次、导入、诊断、通用模板及历史界面 | 42 passed，341.55 秒，退出码 0 | [JUnit](evidence/data-quality-2026-10-26/gui-records-tests.xml) |
+| 测量/输入不确定度与绘图范围界面 | 42 passed，43.95 秒，退出码 0 | [JUnit](evidence/data-quality-2026-10-26/gui-uncertainty-tests.xml) |
+| 点预测、模板、常用入口、窗口与字体回归 | 48 passed，301.85 秒，退出码 0 | [JUnit](evidence/data-quality-2026-10-26/gui-workflow-tests.xml) |
+| 可信度弹窗旧版本保护补充 | 1 passed，2.89 秒，退出码 0 | [JUnit](evidence/data-quality-2026-10-26/gui-stale-settings-tests.xml) |
+| 更正预览中文字段说明复查（与前组重复） | 1 passed，2.97 秒，退出码 0 | [JUnit](evidence/data-quality-2026-10-26/gui-preview-tests.xml) |
+
+新增验证覆盖三种数值模型的已知/未知噪声加权、默认等权与原结果完全一致、可信度降低时矛盾记录影响下降、近期权重与真实预测/推荐管线、是否响应加权及类别参数整体评分。重要度检查主要因素排名、归一化、固定/文字输入、部分响应缺失、耦合约束、随机种子复现、只读计算和真实 spawn 后台进程。分批验证同名批次配置、实际日期与备注修改分离、撤销/重做及重开恢复。
+
+Excel/CSV 检查无变化往返不写入、更新原记录并重算派生值、测量清除、误差详情和旧日期保留、稳定 UID、整批撤销、逐项中文预览、事务中断回滚，以及过期记录/项目、跨项目、非法状态和编号、重复行、删除后编号复用的拒绝。界面覆盖分批/可信度应用与取消、预测值/中位数/零值/不可用统计量、条件变化后原预测失效、回填实测优先、分析取消/失败/导出及旧版本提示；权重修改保留当前模型与随机种子。
+
+已查看[实验记录和待做预测](evidence/data-quality-2026-10-26/records.png)、[可信度设置](evidence/data-quality-2026-10-26/weighting.png)、[重要度表格](evidence/data-quality-2026-10-26/importance.png)、[150% 字体记录页](evidence/data-quality-2026-10-26/records-font150.png)。放大字体后可通过表格滚动、调整列宽和悬停查看完整值。附[合成记录 Excel](evidence/data-quality-2026-10-26/synthetic-records.xlsx)、[合成重要度 Excel](evidence/data-quality-2026-10-26/synthetic-importance.xlsx)、[数值结果](evidence/data-quality-2026-10-26/synthetic-importance.json)及[环境](evidence/data-quality-2026-10-26/environment.json)。示例中的主要因素为温度，模型敏感度综合分约 99.6；这是人工合成规律，不能作为真实机台准确度证据。
+
+复现：在 `python-version/` 内执行 `.venv/bin/python -m pytest tests/unit tests/integration -q -p no:cacheprovider`；GUI 按上表文件组运行（最后保护检查为 `tests/gui/test_data_quality_ui.py::test_stale_weighting_dialog_cannot_overwrite_newer_settings`）。`.venv/bin/python scripts/validate_data_quality.py` 重新生成合成示例与离屏截图。CLI 的 `import --update` 和 `importance --help` 已检查；本地 Markdown 链接和 Git 空白差异检查通过。
+
+首次全部 GUI 单次运行以 143 结束，没有完整总结或可用 JUnit，未计为全部通过依据；随后完成上述全部分组。开发中旧格式误差字典的默认字段导致未修改记录被写回，已修正为按完整误差语义比较，最终完整核心回归通过；早期界面检查的字段名称断言也已修正并通过。核心 26 条警告为现有依赖弃用、矩阵 jitter 和合成输出约束提示，未屏蔽。未做 Windows 实机或真实机台验证。
+
 ## 实验点批量预测与 Excel 导出 · 2026-10-19
 
 本轮完成 **537 项不同测试，全部通过，0 失败、0 错误、0 跳过**：全部单元/集成 416 项、全部 GUI 121 项，包含新增 31 项。分组运行均退出码 0；重复专项和初步回归不重复累计。

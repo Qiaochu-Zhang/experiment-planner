@@ -16,6 +16,7 @@ from experiment_planner.storage.project import Project
 from experiment_planner.precision.rounding import display
 from experiment_planner.ui.help import attach_help, help_label, HelpFilter
 from experiment_planner.ui.messages import user_error, batch_text, exception_diagnostic
+from experiment_planner.ui.messages import record_result_text
 from experiment_planner.ui.diagnostics import show_failure_dialog
 from experiment_planner.ui.measurement_uncertainty import MeasurementUncertaintyDialog
 from experiment_planner.ui.tree_editor import chinese_buttons, JsonTreeEditor
@@ -84,11 +85,16 @@ class RecordDialog(QDialog):
             attach_help(amount,"uncertainty");attach_help(kind,"uncertainty")
             self.cells[name]=value,amount,kind,note,uncertainty
         self.status=QComboBox()
-        for label,code in (("完成","completed"),("部分结果","partial"),("进行中","running"),("失败","failed"),("取消","cancelled")):
+        for label,code in (("完成","completed"),("部分结果","partial"),("待做","pending"),("进行中","running"),("失败","failed"),("取消","cancelled")):
             self.status.addItem(label,code)
         self.status.setCurrentIndex(max(0,self.status.findData(self.record.get("status","completed"))))
         self.note=QLineEdit(self.record.get("note",""))
         form.addRow("实验状态",self.status);form.addRow("整组备注",self.note)
+        self.experiment_batch = QLineEdit(self.record.get("experiment_batch", ""))
+        from experiment_planner.domain.reliability import record_time
+        self.performed_at = QLineEdit(record_time(self.record) or "")
+        self.performed_at.setPlaceholderText("YYYY-MM-DD；完成/部分结果留空使用录入时间，无时区按 UTC")
+        form.addRow("实验批次（可选）", self.experiment_batch); form.addRow("实际实验日期（可选）", self.performed_at)
         buttons=chinese_buttons(QDialogButtonBox(QDialogButtonBox.Save|QDialogButtonBox.Cancel))
         buttons.accepted.connect(self.validate_accept);buttons.rejected.connect(self.reject);outer.addWidget(buttons)
 
@@ -98,6 +104,8 @@ class RecordDialog(QDialog):
             self.template.validate_conditions(values["conditions"], execution=False)
             from experiment_planner.application.records import normalize_observations
             normalize_observations(self.template, values["observations"])
+            from experiment_planner.domain.reliability import experiment_time, batch_name
+            experiment_time(values["performed_at"]); batch_name(values["experiment_batch"])
         except Exception as exc:
             QMessageBox.warning(self,"记录未保存",user_error(exc));return
         self.accept()
@@ -107,7 +115,8 @@ class RecordDialog(QDialog):
         for name,(value,amount,kind,note,original) in self.cells.items():
             uncertainty={**original,"kind":kind.currentData(),"amount":float(amount.text()) if amount.text().strip() else None}
             measurements[name]={"value":value.text(),"uncertainty":uncertainty,"note":note.text()}
-        return {"conditions":{n:editor.text() for n,(editor,_) in self.inputs.items()},"observations":measurements,"status":self.status.currentData(),"note":self.note.text(),"field_notes":{n:note.text() for n,(_,note) in self.inputs.items()}}
+        return {"conditions":{n:editor.text() for n,(editor,_) in self.inputs.items()},"observations":measurements,"status":self.status.currentData(),"note":self.note.text(),"field_notes":{n:note.text() for n,(_,note) in self.inputs.items()},
+                "experiment_batch": self.experiment_batch.text(), "performed_at": self.performed_at.text()}
 
 
 class MainWindow(QMainWindow):
@@ -262,8 +271,8 @@ class MainWindow(QMainWindow):
         self.summary.setText("项目已关闭；可新建或打开本地项目。")
 
     def refresh(self):
-        p=self.require_project();records=p.experiments();fields=p.template.parameters+p.template.metrics
-        headers=["编号","状态",*[f"{f.get('label',f['name'])} ({f.get('unit','1')})" for f in fields],"备注"]
+        p=self.require_project();records=p.experiments();fields=p.template.parameters+p.template.metrics+p.template.measurements
+        headers=["编号","状态",*[f"{f.get('label',f['name'])} ({f.get('unit','1')})" for f in fields],"备注", "实验批次", "批次可信度", "实验日期"]
         self.table.setColumnCount(len(headers));self.table.setHorizontalHeaderLabels(headers);self.table.setRowCount(len(records))
         for index,f in enumerate(fields,2):
             self.table.horizontalHeaderItem(index).setData(Qt.ItemDataRole.UserRole,None)
@@ -273,9 +282,11 @@ class MainWindow(QMainWindow):
         for i,e in enumerate(records):
             cells=[e["id"],status_names[e["status"]]]
             for f in fields:
-                value=e["actual"].get(f["name"],e["derived"].get(f["name"],{}).get("value"))
-                cells.append(display(value,f.get("display_digits")))
+                cells.append(display(e["actual"][f["name"]], f.get("display_digits")) if f["name"] in e["actual"] else record_result_text(e, f, p.template))
             cells.append(e["note"])
+            from experiment_planner.domain.reliability import record_time
+            batch = e.get("experiment_batch", "")
+            cells.extend([batch or "未分批", p.template.data.get("data_weighting", {}).get("batch_confidence", {}).get(batch, 1.), record_time(e) or "未填写"])
             for j,value in enumerate(cells):
                 item=QTableWidgetItem(str(value));item.setToolTip(str(value));self.table.setItem(i,j,item)
             self.baseline.addItem(f"实验 {e['id']} · {status_names[e['status']]}",e["id"])
