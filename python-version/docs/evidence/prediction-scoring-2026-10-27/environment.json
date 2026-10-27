@@ -1,0 +1,10 @@
+{
+  "python": "3.12.3",
+  "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+  "qt_platform": "offscreen",
+  "model": "bayesian_linear_v1",
+  "seed": 7,
+  "prediction_frozen_after_backfill": true,
+  "reopen_preserves_score": true,
+  "data": "synthetic only"
+}

@@ -1,0 +1,463 @@
+{
+  "project_name": "上次预测与回填评分：合成数据",
+  "revision": 7,
+  "entries": [
+    {
+      "record": {
+        "id": 5,
+        "actual": {
+          "x": 0.5
+        },
+        "derived": {
+          "quality_twice": {
+            "formula_version": 1,
+            "reason": "",
+            "sources": [
+              "quality"
+            ],
+            "status": "valid",
+            "uncertainty": {
+              "method": "unknown_uncertainty",
+              "standard": null
+            },
+            "value": 26.0
+          }
+        },
+        "experiment_batch": "",
+        "field_notes": {},
+        "last_prediction": {
+          "conditions": {
+            "x": 0.5
+          },
+          "id": "70ae5204-b70c-4893-80c0-cb4cb3129b25",
+          "known_values": {},
+          "model": "bayesian_linear_v1",
+          "prediction": {
+            "feasibility_probability": 1.0,
+            "objective_predictions": [
+              {
+                "definition": {
+                  "direction": "maximize",
+                  "metric": "quality"
+                },
+                "finite_sample_count": 512,
+                "mean": 9.994359298558702,
+                "nonfinite_counts": {
+                  "nan": 0,
+                  "negative_infinity": 0,
+                  "positive_infinity": 0
+                },
+                "nonfinite_sample_count": 0,
+                "notice": "",
+                "quantiles": [
+                  9.505909245427166,
+                  9.979559195374542,
+                  10.500300191625849
+                ],
+                "ratio_policy": "remove",
+                "sample_count": 512,
+                "summary_notice": "",
+                "summary_status": "ok"
+              }
+            ],
+            "quality": {
+              "finite_sample_count": 512,
+              "interval_kind": "latent_response",
+              "mean": 9.994359298558702,
+              "moment_notice": "",
+              "nonfinite_counts": {
+                "nan": 0,
+                "negative_infinity": 0,
+                "positive_infinity": 0
+              },
+              "nonfinite_sample_count": 0,
+              "quantiles": [
+                9.505909245427166,
+                9.979559195374542,
+                10.500300191625849
+              ],
+              "sample_count": 512,
+              "source": "joint_posterior_samples",
+              "summary_notice": "",
+              "summary_status": "ok"
+            },
+            "quality_twice": {
+              "expression": "quality * 2",
+              "finite_sample_count": 512,
+              "interval_kind": "latent_response",
+              "mean": 19.988718597117405,
+              "moment_notice": "",
+              "nonfinite_counts": {
+                "nan": 0,
+                "negative_infinity": 0,
+                "positive_infinity": 0
+              },
+              "nonfinite_sample_count": 0,
+              "quantiles": [
+                19.01181849085433,
+                19.959118390749083,
+                21.000600383251697
+              ],
+              "sample_count": 512,
+              "source": "joint_posterior_samples",
+              "summary_notice": "",
+              "summary_status": "ok"
+            },
+            "samples": 512,
+            "seed": 7
+          },
+          "record_uid": "33b5b02d-61ca-4084-8077-4a06c50b566f",
+          "revision": 5,
+          "saved_at": "2026-10-27T06:42:59.023935+00:00",
+          "seed": 7,
+          "source": "record_prediction",
+          "template_snapshot": {
+            "derived_metrics": [
+              {
+                "expression": "quality * 2",
+                "label": "两倍响应",
+                "name": "quality_twice",
+                "unit": "1"
+              }
+            ],
+            "measurements": [
+              {
+                "is_response": true,
+                "label": "响应质量",
+                "name": "quality",
+                "unit": "1"
+              }
+            ],
+            "name": "预测回填合成示例（非真实数据）",
+            "objectives": [
+              {
+                "direction": "maximize",
+                "metric": "quality"
+              }
+            ],
+            "optimization": {
+              "default_model_preset": "bayesian_linear_v1",
+              "mode": "single"
+            },
+            "parameters": [
+              {
+                "bounds": [
+                  0.0,
+                  1.0
+                ],
+                "label": "实验条件 X",
+                "name": "x"
+              }
+            ],
+            "ratio_policy": {
+              "mode": "remove"
+            },
+            "schema_version": 2,
+            "template_version": 1
+          },
+          "training_includes_record": false
+        },
+        "note": "",
+        "observations": {
+          "quality": {
+            "note": "",
+            "uncertainty": {
+              "amount": null,
+              "confidence": null,
+              "coverage_factor": null,
+              "distribution": null,
+              "kind": "unspecified",
+              "lower": null,
+              "source": null,
+              "upper": null
+            },
+            "unit": "1",
+            "value": 13.0
+          }
+        },
+        "performed_at": "2026-10-27T06:43:00.612313+00:00",
+        "prediction_evaluation": {
+          "reference": "measurement_as_truth",
+          "rows": [
+            {
+              "absolute_error": 3.0056407014412976,
+              "brier_score": null,
+              "center_kind": "均值",
+              "comparison_kind": "事前预测对照",
+              "covered95": false,
+              "interval_score95": 100.98238328116473,
+              "kind": "numeric",
+              "label": "响应质量",
+              "lower95": 9.505909245427166,
+              "measured": 13.0,
+              "metric": "quality",
+              "model": "bayesian_linear_v1",
+              "prediction_center": 9.994359298558702,
+              "prediction_mean": 9.994359298558702,
+              "prediction_median": 9.979559195374542,
+              "reason": "已按测量值评分",
+              "signed_error": -3.0056407014412976,
+              "squared_error": 9.033876026160536,
+              "status": "scored",
+              "unit": "1",
+              "upper95": 10.500300191625849,
+              "width95": 0.9943909461986831
+            },
+            {
+              "absolute_error": 6.011281402882595,
+              "brier_score": null,
+              "center_kind": "均值",
+              "comparison_kind": "事前预测对照",
+              "covered95": false,
+              "interval_score95": 201.96476656232946,
+              "kind": "numeric",
+              "label": "两倍响应",
+              "lower95": 19.01181849085433,
+              "measured": 26.0,
+              "metric": "quality_twice",
+              "model": "bayesian_linear_v1",
+              "prediction_center": 19.988718597117405,
+              "prediction_mean": 19.988718597117405,
+              "prediction_median": 19.959118390749083,
+              "reason": "已按测量值评分",
+              "signed_error": -6.011281402882595,
+              "squared_error": 36.135504104642145,
+              "status": "scored",
+              "unit": "1",
+              "upper95": 21.000600383251697,
+              "width95": 1.9887818923973661
+            }
+          ],
+          "snapshot_id": "70ae5204-b70c-4893-80c0-cb4cb3129b25"
+        },
+        "record_uid": "33b5b02d-61ca-4084-8077-4a06c50b566f",
+        "status": "completed",
+        "suggested": null,
+        "template_version": 1,
+        "updated": "2026-10-27T06:43:00.612330+00:00"
+      },
+      "snapshot": {
+        "conditions": {
+          "x": 0.5
+        },
+        "id": "70ae5204-b70c-4893-80c0-cb4cb3129b25",
+        "known_values": {},
+        "model": "bayesian_linear_v1",
+        "prediction": {
+          "feasibility_probability": 1.0,
+          "objective_predictions": [
+            {
+              "definition": {
+                "direction": "maximize",
+                "metric": "quality"
+              },
+              "finite_sample_count": 512,
+              "mean": 9.994359298558702,
+              "nonfinite_counts": {
+                "nan": 0,
+                "negative_infinity": 0,
+                "positive_infinity": 0
+              },
+              "nonfinite_sample_count": 0,
+              "notice": "",
+              "quantiles": [
+                9.505909245427166,
+                9.979559195374542,
+                10.500300191625849
+              ],
+              "ratio_policy": "remove",
+              "sample_count": 512,
+              "summary_notice": "",
+              "summary_status": "ok"
+            }
+          ],
+          "quality": {
+            "finite_sample_count": 512,
+            "interval_kind": "latent_response",
+            "mean": 9.994359298558702,
+            "moment_notice": "",
+            "nonfinite_counts": {
+              "nan": 0,
+              "negative_infinity": 0,
+              "positive_infinity": 0
+            },
+            "nonfinite_sample_count": 0,
+            "quantiles": [
+              9.505909245427166,
+              9.979559195374542,
+              10.500300191625849
+            ],
+            "sample_count": 512,
+            "source": "joint_posterior_samples",
+            "summary_notice": "",
+            "summary_status": "ok"
+          },
+          "quality_twice": {
+            "expression": "quality * 2",
+            "finite_sample_count": 512,
+            "interval_kind": "latent_response",
+            "mean": 19.988718597117405,
+            "moment_notice": "",
+            "nonfinite_counts": {
+              "nan": 0,
+              "negative_infinity": 0,
+              "positive_infinity": 0
+            },
+            "nonfinite_sample_count": 0,
+            "quantiles": [
+              19.01181849085433,
+              19.959118390749083,
+              21.000600383251697
+            ],
+            "sample_count": 512,
+            "source": "joint_posterior_samples",
+            "summary_notice": "",
+            "summary_status": "ok"
+          },
+          "samples": 512,
+          "seed": 7
+        },
+        "record_uid": "33b5b02d-61ca-4084-8077-4a06c50b566f",
+        "revision": 5,
+        "saved_at": "2026-10-27T06:42:59.023935+00:00",
+        "seed": 7,
+        "source": "record_prediction",
+        "template_snapshot": {
+          "derived_metrics": [
+            {
+              "expression": "quality * 2",
+              "label": "两倍响应",
+              "name": "quality_twice",
+              "unit": "1"
+            }
+          ],
+          "measurements": [
+            {
+              "is_response": true,
+              "label": "响应质量",
+              "name": "quality",
+              "unit": "1"
+            }
+          ],
+          "name": "预测回填合成示例（非真实数据）",
+          "objectives": [
+            {
+              "direction": "maximize",
+              "metric": "quality"
+            }
+          ],
+          "optimization": {
+            "default_model_preset": "bayesian_linear_v1",
+            "mode": "single"
+          },
+          "parameters": [
+            {
+              "bounds": [
+                0.0,
+                1.0
+              ],
+              "label": "实验条件 X",
+              "name": "x"
+            }
+          ],
+          "ratio_policy": {
+            "mode": "remove"
+          },
+          "schema_version": 2,
+          "template_version": 1
+        },
+        "training_includes_record": false
+      },
+      "evaluation": {
+        "snapshot_id": "70ae5204-b70c-4893-80c0-cb4cb3129b25",
+        "reference": "measurement_as_truth",
+        "rows": [
+          {
+            "metric": "quality",
+            "label": "响应质量",
+            "unit": "1",
+            "kind": "numeric",
+            "model": "bayesian_linear_v1",
+            "prediction_mean": 9.994359298558702,
+            "prediction_median": 9.979559195374542,
+            "prediction_center": 9.994359298558702,
+            "center_kind": "均值",
+            "lower95": 9.505909245427166,
+            "upper95": 10.500300191625849,
+            "measured": 13.0,
+            "signed_error": -3.0056407014412976,
+            "absolute_error": 3.0056407014412976,
+            "squared_error": 9.033876026160536,
+            "covered95": false,
+            "width95": 0.9943909461986831,
+            "interval_score95": 100.98238328116473,
+            "brier_score": null,
+            "status": "scored",
+            "reason": "已按测量值评分",
+            "comparison_kind": "事前预测对照"
+          },
+          {
+            "metric": "quality_twice",
+            "label": "两倍响应",
+            "unit": "1",
+            "kind": "numeric",
+            "model": "bayesian_linear_v1",
+            "prediction_mean": 19.988718597117405,
+            "prediction_median": 19.959118390749083,
+            "prediction_center": 19.988718597117405,
+            "center_kind": "均值",
+            "lower95": 19.01181849085433,
+            "upper95": 21.000600383251697,
+            "measured": 26.0,
+            "signed_error": -6.011281402882595,
+            "absolute_error": 6.011281402882595,
+            "squared_error": 36.135504104642145,
+            "covered95": false,
+            "width95": 1.9887818923973661,
+            "interval_score95": 201.96476656232946,
+            "brier_score": null,
+            "status": "scored",
+            "reason": "已按测量值评分",
+            "comparison_kind": "事前预测对照"
+          }
+        ]
+      }
+    }
+  ],
+  "summaries": [
+    {
+      "metric": "quality",
+      "label": "响应质量",
+      "unit": "1",
+      "model": "bayesian_linear_v1",
+      "kind": "numeric",
+      "point_count": 1,
+      "interval_count": 1,
+      "mae": 3.0056407014412976,
+      "rmse": 3.0056407014412976,
+      "coverage95": 0.0,
+      "mean_width95": 0.9943909461986831,
+      "mean_interval_score95": 100.98238328116473,
+      "brier_count": 0,
+      "mean_brier_score": null,
+      "known_result_comparisons": 0
+    },
+    {
+      "metric": "quality_twice",
+      "label": "两倍响应",
+      "unit": "1",
+      "model": "bayesian_linear_v1",
+      "kind": "numeric",
+      "point_count": 1,
+      "interval_count": 1,
+      "mae": 6.011281402882595,
+      "rmse": 6.011281402882595,
+      "coverage95": 0.0,
+      "mean_width95": 1.9887818923973661,
+      "mean_interval_score95": 201.96476656232946,
+      "brier_count": 0,
+      "mean_brier_score": null,
+      "known_result_comparisons": 0
+    }
+  ]
+}

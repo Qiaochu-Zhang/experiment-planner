@@ -22,6 +22,7 @@ from experiment_planner.ui.conditions import ConditionsForm
 from experiment_planner.ui.plot_ranges import PlotRangesForm
 from experiment_planner.ui.point_prediction import PointPredictionPanel
 from experiment_planner.ui.data_quality import ExperimentBatchDialog, DataWeightingDialog, ImportancePanel
+from experiment_planner.ui.prediction_scores import PredictionScoresDialog
 from experiment_planner.ui.help import attach_help, help_label, show_help
 from experiment_planner.ui.tree_editor import chinese_buttons
 from experiment_planner.ui.messages import analysis_text
@@ -159,6 +160,7 @@ class PythonWindow(MainWindow):
         self.point_prediction.cancel_requested.connect(self.cancel_analysis)
         self.point_prediction.export_requested.connect(lambda:self.guard(self.export_point_prediction_data))
         self.point_prediction.details_requested.connect(lambda:self.guard(lambda:self.show_details(self.point_prediction.report or {})))
+        self.point_prediction.record_requested.connect(lambda:self.guard(self.record_point_predictions))
         self.model.currentTextChanged.connect(self.update_prediction_model_hint)
         self.seed.valueChanged.connect(self.update_prediction_model_hint)
         self.update_prediction_model_hint()
@@ -176,6 +178,12 @@ class PythonWindow(MainWindow):
         self.weighting_button = button("批次可信度 / 近期权重", lambda:self.guard(self.edit_data_weighting), quality_actions)
         button("导出实验记录", lambda:self.guard(self.export_data), quality_actions)
         self.bulk_update_button = button("导入 Excel / CSV 批量修改", lambda:self.guard(lambda:self.import_data("update")), quality_actions)
+        prediction_actions = QHBoxLayout(); self.tabs.widget(0).layout().insertLayout(2, prediction_actions)
+        self.record_prediction_button = button("预测并记录上次预测（所选 / 全部）", lambda:self.guard(self.start_record_prediction), prediction_actions)
+        self.prediction_scores_button = button("查看上次预测 / 回填评分", lambda:self.guard(self.show_prediction_scores), prediction_actions)
+        button("取消记录预测", self.cancel_analysis, prediction_actions)
+        self.record_prediction_status = QLabel("推荐实验自动保留预测；手动记录可先预测并记录，再回填测量值评分。")
+        self.record_prediction_status.setWordWrap(True); self.tabs.widget(0).layout().insertWidget(3, self.record_prediction_status)
         self.build_workspace()
         project_actions = QHBoxLayout()
         self.centralWidget().layout().insertLayout(1, project_actions)
@@ -353,6 +361,7 @@ class PythonWindow(MainWindow):
         self.analysis_report=None
         if hasattr(self, "point_prediction"): self.point_prediction.clear()
         if hasattr(self, "importance"): self.importance.clear()
+        if hasattr(self, "record_prediction_status"): self.record_prediction_status.setText("")
         if hasattr(self, "export_batch_button"): self.export_batch_button.setEnabled(False)
         if hasattr(self,"home_summary"):self.home_summary.setText("请新建或打开项目。")
         for name in ("template_view", "conditions", "plot_ranges", "plot_variables", "analysis_output", "plot_image"):
@@ -432,6 +441,32 @@ class PythonWindow(MainWindow):
         request.update(model=self.model.currentData(), seed=self.seed.value())
         self.start_analysis_task(project, request, "points")
 
+    def start_record_prediction(self):
+        project = self.require_project()
+        ids = [int(self.table.item(row.row(), 0).text()) for row in self.table.selectionModel().selectedRows()]
+        with project.transaction():
+            records = [project.experiment(eid) for eid in sorted(ids)] if ids else project.experiments()
+            if not records: raise ValidationError("请先录入或推荐至少一条实验，再记录模型预测")
+            request = {"conditions": [r["actual"] for r in records],
+                       "source_experiments": [{"experiment_id": r["id"], "record_uid": r.get("record_uid"), "copied_revision": project.revision} for r in records],
+                       "model": self.model.currentData(), "seed": self.seed.value()}
+        self.start_analysis_task(project, request, "record_predictions")
+
+    def record_point_predictions(self):
+        report = self.point_prediction.report
+        if report is None: raise ValidationError("请先完成批量实验点预测，再记录到原实验")
+        ids = self.service.save_record_predictions(report)
+        self.refresh(); self.point_prediction.record_button.setEnabled(False)
+        self.statusBar().showMessage(f"已将 {len(ids)} 条预测记录到原实验，回填或更正测量后可评分；Ctrl+S 保存。", 15000)
+
+    def show_prediction_scores(self):
+        from experiment_planner.io.score_export import prediction_score_report
+        project = self.require_project()
+        ids = [int(self.table.item(row.row(), 0).text()) for row in self.table.selectionModel().selectedRows()]
+        report = prediction_score_report(project, ids or None)
+        if not report["entries"]: raise ValidationError("请先录入或推荐实验记录")
+        PredictionScoresDialog(report, self).exec()
+
     def update_prediction_model_hint(self, *_):
         self.point_prediction.model_hint.setText(f"当前模型：{self.model.currentText()}；随机种子：{self.seed.value()}。可在“下一批实验”中更改。")
 
@@ -493,6 +528,7 @@ class PythonWindow(MainWindow):
         self.analyze_button.setEnabled(False)
         self.point_prediction.set_busy(True)
         self.importance.set_busy(True)
+        self.record_prediction_button.setEnabled(False)
         if kind == "importance":
             self.importance.clear(); self.importance.set_busy(True)
             self.importance_template = self.active_analysis_template
@@ -500,6 +536,8 @@ class PythonWindow(MainWindow):
         elif kind == "points":
             self.point_prediction.reset_result()
             self.point_prediction.output.setPlainText(f"正在拟合所选模型并批量预测 {len(request['conditions'])} 个实验点；可取消。")
+        elif kind == "record_predictions":
+            self.record_prediction_status.setText(f"正在拟合当前模型并预测 {len(request['conditions'])} 条实验；完成后保存为上次预测，可取消。")
         else:
             self.analysis_report = None
             self.analysis_output.setPlainText("正在本地拟合与预测；区间表示潜在响应，不包含未知的未来量测误差。")
@@ -512,15 +550,28 @@ class PythonWindow(MainWindow):
             return
         self.point_prediction.set_busy(False)
         self.importance.set_busy(False)
+        self.record_prediction_button.setEnabled(True)
         if "error" in result:
-            output = self.importance.output if self.analysis_kind == "importance" else self.point_prediction.output if self.analysis_kind == "points" else self.analysis_output
-            output.setPlainText(result["error"] + "\n点击窗口顶部“查看原始诊断”可重新查看本次失败详情。")
+            if self.analysis_kind == "record_predictions":
+                self.record_prediction_status.setText(result["error"] + "；原预测保留，可查看原始诊断。")
+            else:
+                output = self.importance.output if self.analysis_kind == "importance" else self.point_prediction.output if self.analysis_kind == "points" else self.analysis_output
+                output.setPlainText(result["error"] + "\n点击窗口顶部“查看原始诊断”可重新查看本次失败详情。")
             title = "实验条件重要度分析未完成" if self.analysis_kind == "importance" else "批量实验点预测未完成" if self.analysis_kind == "points" else "预测 / 绘图未完成"
             self.show_failure(result["error"], result.get("diagnostic"), title)
             return
         self.guard(lambda: self.display_analysis(result["result"]))
 
     def display_analysis(self, report):
+        if self.analysis_kind == "record_predictions":
+            try:
+                ids = self.service.save_record_predictions(report)
+            except Exception:
+                self.record_prediction_status.setText("本次预测未保存；原预测保留，请重新预测或查看原始诊断。")
+                raise
+            self.refresh()
+            self.record_prediction_status.setText(f"已记录 {len(ids)} 条实验的模型预测；回填或更正测量值后自动评分。Ctrl+S 保存，Ctrl+Z 撤销。")
+            return
         if self.analysis_kind == "importance":
             self.importance.display_report(report, self.active_analysis_template, self.require_project().revision)
             return
@@ -544,6 +595,8 @@ class PythonWindow(MainWindow):
                 self.point_prediction.output.setPlainText("批量预测已取消，尚无可导出的新结果。可重新点击批量预测。")
             elif self.analysis_kind == "importance":
                 self.importance.output.setPlainText("重要度分析已取消，可重新计算。")
+            elif self.analysis_kind == "record_predictions":
+                self.record_prediction_status.setText("记录预测已取消，原来保存的预测保留。")
         if hasattr(self, "analysis_timer"):
             self.analysis_timer.stop()
             self.analyze_button.setEnabled(True)
@@ -551,6 +604,8 @@ class PythonWindow(MainWindow):
             self.point_prediction.set_busy(False)
         if hasattr(self, "importance"):
             self.importance.set_busy(False)
+        if hasattr(self, "record_prediction_button"):
+            self.record_prediction_button.setEnabled(True)
 
     def cancel(self):
         self.cancel_analysis()

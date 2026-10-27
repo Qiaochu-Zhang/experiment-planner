@@ -230,6 +230,8 @@ def export_records(project, path):
         path.write_text(json.dumps(project.snapshot(), ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
         return
     rows = []
+    from experiment_planner.application.prediction_scoring import snapshot_for_record, evaluate_record
+    prediction_batches = {}
     project_uid = project.db.execute("SELECT uuid FROM project WHERE id=1").fetchone()[0]
     for e in project.experiments():
         row = {"experiment_id": e["id"], "record_uid": e.get("record_uid", ""), "project_uid": project_uid,
@@ -242,6 +244,17 @@ def export_records(project, path):
         for n, c in e["derived"].items(): row.update({n: c["value"], n+"_status": c["status"]})
         row["suggested_json"] = json.dumps(e.get("suggested"), ensure_ascii=False)
         row["prediction_json"] = json.dumps(e.get("prediction"), ensure_ascii=False)
+        snapshot = snapshot_for_record(project, e, prediction_batches)
+        evaluation = evaluate_record(project.template, e, snapshot)
+        row["last_prediction_json"] = json.dumps(snapshot, ensure_ascii=False, allow_nan=False)
+        row["prediction_evaluation_json"] = json.dumps(evaluation, ensure_ascii=False, allow_nan=False)
+        for score in evaluation["rows"]:
+            prefix = "上次预测评分:" + score["metric"] + ":"
+            row.update({prefix + "预测中心": score["prediction_center"], prefix + "下限2.5%": score["lower95"],
+                        prefix + "上限97.5%": score["upper95"], prefix + "测量对照值": score["measured"],
+                        prefix + "绝对误差": score["absolute_error"], prefix + "覆盖": score["covered95"],
+                        prefix + "IS95": score["interval_score95"], prefix + "Brier": score["brier_score"],
+                        prefix + "说明": score["reason"]})
         rows.append(row)
     headers = list(dict.fromkeys(["experiment_id", "record_uid", "project_uid", "record_token", "status", "note", "experiment_batch", "performed_at",
         *(p["name"] for p in project.template.parameters), *(p["name"]+"_note" for p in project.template.parameters),
@@ -274,6 +287,7 @@ def export_records(project, path):
             ["实验日期", "填写 YYYY-MM-DD 或 ISO 日期时间；无时区按 UTC。完成/部分结果日期留空采用本次录入时间。"],
             ["批次可信度", "在软件“批次可信度 / 近期权重”中设置。未设置的批次默认 1。"],
             ["只读结果", "派生值由原始测量重算；prediction_json、suggested_json 仅供查看，修改它们不改变模型预测。"],
+            ["预测评分", "上次预测及评分列仅供查看；修改测量后重新导入，使用原预测重算评分，不接受表格伪造的预测或评分。"],
             ["误差详情", "常规误差列优先；uncertainty_json 保留相关来源及非对称界限等详细信息，通常无需改动。"],
         ]: guide.append(values)
         guide.column_dimensions["A"].width = 20; guide.column_dimensions["B"].width = 110

@@ -78,12 +78,17 @@ def record_result_text(record, field, template):
     cell = record.get("observations", {}).get(name, record.get("derived", {}).get(name, {}))
     if cell.get("value") is not None:
         return display(cell["value"], field.get("display_digits"))
-    prediction = record.get("prediction") or {}
+    last = record.get("last_prediction") or {}
+    prediction = last.get("prediction") or record.get("prediction") or {}
     if not prediction or record.get("status") not in ("pending", "running", "partial"):
         return "未测"
-    snapshot = record.get("prediction_conditions") or record.get("suggested")
+    snapshot = last.get("conditions") or record.get("prediction_conditions") or record.get("suggested")
     if snapshot is not None and snapshot != record["actual"]:
         return "未测（条件已改，原预测不适用）"
+    if last.get("template_snapshot"):
+        from experiment_planner.application.prediction_scoring import definition
+        if definition(last["template_snapshot"], name) != definition(template.data, name):
+            return "未测（字段或公式已改，原预测不适用）"
     item = prediction.get(name)
     if not isinstance(item, dict): return "未测"
     value, kind = item.get("mean"), "均值"
@@ -95,6 +100,21 @@ def record_result_text(record, field, template):
         return "未测（预测不可用）"
     suffix = "；有限样本" if item.get("nonfinite_sample_count") else ""
     return f"未测（预测{kind} {formatted(value, name, template)}{suffix}）"
+
+
+def record_score_text(evaluation):
+    if not evaluation.get("rows"): return "暂无保存预测"
+    parts = []
+    for row in evaluation["rows"]:
+        if row["status"] != "scored":
+            parts.append(f"{row['label']}：{row['reason']}")
+        elif row["kind"] == "boolean":
+            parts.append(f"{row['label']}：Brier={row['brier_score']:.5g}")
+        else:
+            text = f"{row['label']}：AE={row['absolute_error']:.5g}"
+            if row["interval_score95"] is not None: text += f"，IS95={row['interval_score95']:.5g}"
+            parts.append(text)
+    return "；".join(parts)
 
 
 def _interval_lines(item, name, label, template, *, objective=False):

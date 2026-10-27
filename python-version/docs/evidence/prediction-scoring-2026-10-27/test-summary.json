@@ -1,0 +1,65 @@
+{
+  "unique_tests": 634,
+  "core": 492,
+  "gui": 142,
+  "new_tests": 52,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "groups": [
+    {
+      "file": "core-tests.xml",
+      "tests": 492,
+      "seconds": 209.472,
+      "exit_code": 0
+    },
+    {
+      "file": "gui-diagnostics-tests.xml",
+      "tests": 23,
+      "seconds": 153.403,
+      "exit_code": 0
+    },
+    {
+      "file": "gui-display-recheck.xml",
+      "tests": 20,
+      "seconds": 78.568,
+      "exit_code": 0
+    },
+    {
+      "file": "gui-history-tests.xml",
+      "tests": 20,
+      "seconds": 76.327,
+      "exit_code": 0
+    },
+    {
+      "file": "gui-template-tests.xml",
+      "tests": 14,
+      "seconds": 19.423,
+      "exit_code": 0
+    },
+    {
+      "file": "gui-uncertainty-tests.xml",
+      "tests": 42,
+      "seconds": 45.419,
+      "exit_code": 0
+    },
+    {
+      "file": "gui-window-tests.xml",
+      "tests": 23,
+      "seconds": 86.068,
+      "exit_code": 0
+    }
+  ],
+  "incomplete_attempts": [
+    {
+      "group": "initial larger GUI records group",
+      "exit_code": 143,
+      "used_as_pass_evidence": false
+    },
+    {
+      "group": "initial larger GUI workflow/layout group",
+      "exit_code": 143,
+      "used_as_pass_evidence": false
+    }
+  ]
+}

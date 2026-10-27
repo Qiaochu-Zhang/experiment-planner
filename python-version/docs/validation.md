@@ -1,5 +1,29 @@
 # Python 源码版验证报告
 
+## 保存上次预测与测量回填评分 · 2026-10-27
+
+完成 **634 项不同测试，全部通过，0 失败、0 错误、0 跳过**：全部单元/集成 492 项、全部界面 142 项。新增 52 项（22 单元、21 集成、9 界面），重复专项与界面复查不重复计数。所有最终分组进程退出码均为 0；[去重汇总](evidence/prediction-scoring-2026-10-27/test-summary.json)保留各组结果。环境为本目录独立 `.venv`、Linux / Python 3.12.3 / Qt offscreen。
+
+| 验证组 | 结果 | 证据 |
+| --- | --- | --- |
+| 全部单元/集成 | 492 passed，209.52 秒，退出码 0 | [JUnit](evidence/prediction-scoring-2026-10-27/core-tests.xml) |
+| 新评分界面与已有批量点预测（含显示复查） | 20 passed，78.63 秒，退出码 0 | [JUnit](evidence/prediction-scoring-2026-10-27/gui-display-recheck.xml) |
+| 推荐导出、数据可信度与历史界面 | 20 passed，76.32 秒，退出码 0 | [JUnit](evidence/prediction-scoring-2026-10-27/gui-history-tests.xml) |
+| 诊断与通用模板 | 23 passed，153.45 秒，退出码 0 | [JUnit](evidence/prediction-scoring-2026-10-27/gui-diagnostics-tests.xml) |
+| 测量/输入不确定度与绘图范围 | 42 passed，45.42 秒，退出码 0 | [JUnit](evidence/prediction-scoring-2026-10-27/gui-uncertainty-tests.xml) |
+| 模板工作流、保存与覆盖 | 14 passed，19.43 秒，退出码 0 | [JUnit](evidence/prediction-scoring-2026-10-27/gui-template-tests.xml) |
+| 常用入口、窗口、字体与原记录窗口 | 23 passed，86.06 秒，退出码 0 | [JUnit](evidence/prediction-scoring-2026-10-27/gui-window-tests.xml) |
+
+新增验证检查 AE/SE/IS95 的独立数值算例、端点包含、零值与零宽区间、无均值时用中位数、无效区间保留点误差、非有限预测/无效测量不记零分、公式/条件改变保护、是否响应 Brier、按模型分组及各类有效计数、极大数值不输出 Inf。
+
+存储与实际模型检查覆盖：推荐自动保存与旧推荐恢复；手动记录预测；GP/RBF、GP/Matérn 和贝叶斯线性真实计算的快照逐项保留；补测后禁止再次调用模型、后续更正不覆盖原预测；保存重开、整批撤销/重做、事务中断回滚、过期版本/身份/重复来源/条件变化的原子拒绝；模板公式更新后仅停止受影响指标；显式项目保存、CLI 保存与导出；增加预测元数据后原有外部编号去重继续有效。
+
+CSV/Excel 验证更正测量后重算评分、无变化往返跳过、预测及评分只读列不能伪造、更正与撤销保留原快照、导出完整数值及字面文本、五个工作表及公式页。界面验证所选/全部入口、普通批量预测保持只读而主动记录才保存、真实 spawn 后台进程、取消/失败/过期结果保留原预测、实际回填窗口及记录表摘要、所选评分过滤、公式查看与 Excel 导出。
+
+已查看[回填前](evidence/prediction-scoring-2026-10-27/before-backfill.png)、[回填后](evidence/prediction-scoring-2026-10-27/after-backfill.png)与[上次预测和评分明细](evidence/prediction-scoring-2026-10-27/score-details.png)。附[评分 Excel 示例](evidence/prediction-scoring-2026-10-27/synthetic-scores.xlsx)、[记录 Excel 示例](evidence/prediction-scoring-2026-10-27/synthetic-records.xlsx)、[数值快照](evidence/prediction-scoring-2026-10-27/synthetic-score-report.json)及[环境](evidence/prediction-scoring-2026-10-27/environment.json)。脚本使用合成线性规律拟合真实贝叶斯线性模型，保存预测后补入测量 13；核对回填后预测完全不变，并确认重开保持评分。未使用用户实际数据，也未验证真实机台准确度或 Windows 实机行为。
+
+在 `python-version/` 内复现：`.venv/bin/python -m pytest tests/unit tests/integration -q -p no:cacheprovider`，GUI 按上表所列测试文件组分别运行；`.venv/bin/python scripts/validate_prediction_scores.py` 生成示例与截图。初期两个较大的 GUI 分组进程以 143 结束，没有完整报告，未计为通过；随后以较小分组完成全部界面。开发中发现 SQLite JSON 键排序影响评分行顺序，已改为按模板字段顺序输出，最终完整回归通过。核心 26 条现有依赖弃用、矩阵 jitter 及合成可行性提示未屏蔽。公式与口径见 [使用说明](../src/experiment_planner/resources/help/使用说明.md#上次预测与回填评分)。
+
 ## 条件重要度、批次可信度、近期权重与批量更正 · 2026-10-26
 
 完成 **582 项不同测试，全部通过，0 失败、0 错误、0 跳过**：全部单元/集成 449 项、全部界面 133 项，包含新增 45 项（33 项核心、12 项界面）。分组进程退出码均为 0；重复专项检查不重复计数。环境为本目录独立 `.venv`、Linux / Python 3.12.3 / Qt offscreen。

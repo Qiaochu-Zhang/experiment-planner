@@ -17,6 +17,8 @@ from experiment_planner.precision.rounding import display
 from experiment_planner.ui.help import attach_help, help_label, HelpFilter
 from experiment_planner.ui.messages import user_error, batch_text, exception_diagnostic
 from experiment_planner.ui.messages import record_result_text
+from experiment_planner.ui.messages import record_score_text
+from experiment_planner.application.prediction_scoring import snapshot_for_record, evaluate_record
 from experiment_planner.ui.diagnostics import show_failure_dialog
 from experiment_planner.ui.measurement_uncertainty import MeasurementUncertaintyDialog
 from experiment_planner.ui.tree_editor import chinese_buttons, JsonTreeEditor
@@ -272,13 +274,14 @@ class MainWindow(QMainWindow):
 
     def refresh(self):
         p=self.require_project();records=p.experiments();fields=p.template.parameters+p.template.metrics+p.template.measurements
-        headers=["编号","状态",*[f"{f.get('label',f['name'])} ({f.get('unit','1')})" for f in fields],"备注", "实验批次", "批次可信度", "实验日期"]
+        headers=["编号","状态",*[f"{f.get('label',f['name'])} ({f.get('unit','1')})" for f in fields],"备注", "实验批次", "批次可信度", "实验日期", "上次预测 / 评分（越小越好）", "预测模型 / 时间"]
         self.table.setColumnCount(len(headers));self.table.setHorizontalHeaderLabels(headers);self.table.setRowCount(len(records))
         for index,f in enumerate(fields,2):
             self.table.horizontalHeaderItem(index).setData(Qt.ItemDataRole.UserRole,None)
             self.table.horizontalHeaderItem(index).setToolTip("")
         status_names={"completed":"完成","partial":"部分结果","failed":"失败","cancelled":"取消","pending":"待做","running":"进行中"}
         self.baseline.clear();self.baseline.addItem("不指定",None)
+        prediction_batches = {}
         for i,e in enumerate(records):
             cells=[e["id"],status_names[e["status"]]]
             for f in fields:
@@ -287,6 +290,9 @@ class MainWindow(QMainWindow):
             from experiment_planner.domain.reliability import record_time
             batch = e.get("experiment_batch", "")
             cells.extend([batch or "未分批", p.template.data.get("data_weighting", {}).get("batch_confidence", {}).get(batch, 1.), record_time(e) or "未填写"])
+            snapshot = snapshot_for_record(p, e, prediction_batches)
+            cells.extend([record_score_text(evaluate_record(p.template, e, snapshot)),
+                          ((snapshot.get("model") or "旧预测") + " / " + (snapshot.get("saved_at") or "旧预测时间未记录")) if snapshot else "—"])
             for j,value in enumerate(cells):
                 item=QTableWidgetItem(str(value));item.setToolTip(str(value));self.table.setItem(i,j,item)
             self.baseline.addItem(f"实验 {e['id']} · {status_names[e['status']]}",e["id"])

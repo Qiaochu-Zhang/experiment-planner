@@ -5,6 +5,9 @@ from functools import wraps
 
 from experiment_planner.application.records import derive, normalize_observations
 from experiment_planner.application.measurement_uncertainty import plan_measurement_uncertainty
+from experiment_planner.application.prediction_scoring import (
+    evaluate_record, snapshot_for_record, make_prediction_snapshot, known_results,
+)
 from experiment_planner.domain.errors import ValidationError
 from experiment_planner.domain.reliability import batch_name, confidence_value, experiment_time, record_time
 from experiment_planner.storage.project import Project, encode, now
@@ -36,6 +39,7 @@ class PlannerService:
         self.project = project
         self._undo, self._redo = [], []
         self._history_revision = project.revision
+        self._prediction_batch_cache = {}
 
     def _restore(self, state, action):
         p = self.project
@@ -89,12 +93,64 @@ class PlannerService:
         if "performed_at" not in kwargs:
             kwargs["performed_at"] = record_time(old)
         new = self.prepare_record(conditions, observations, suggested=old.get("suggested"), **kwargs)
-        for key in ("record_uid", "repeat_of_uid", "baseline_id_uid", "batch_id", "prediction", "arrangement", "changes", "repeat_of", "baseline_id", "cross_members", "prediction_conditions"):
+        for key in ("record_uid", "repeat_of_uid", "baseline_id_uid", "batch_id", "prediction", "arrangement", "changes", "repeat_of", "baseline_id", "cross_members", "prediction_conditions", "last_prediction"):
             if key in old: new[key] = old[key]
         # Backfill a stable condition snapshot for older recommended records.
         if old.get("prediction") and "prediction_conditions" not in new:
             new["prediction_conditions"] = copy.deepcopy(old.get("suggested") or old["actual"])
+        self._refresh_prediction_score(new, old)
         return new
+
+    def _refresh_prediction_score(self, record, source=None, template=None):
+        snapshot = record.get("last_prediction") or snapshot_for_record(
+            self.project, source or record, self._prediction_batch_cache)
+        if snapshot:
+            record["last_prediction"] = copy.deepcopy(snapshot)
+            record["prediction_evaluation"] = evaluate_record(template or self.project.template, record, snapshot)
+
+    @reversible
+    def save_record_predictions(self, report):
+        """Freeze an explicit prediction request as one reversible record operation."""
+        from experiment_planner.domain.errors import StaleVersionError
+        p = self.project
+        if report.get("revision") != self._action_revision or report.get("template_version") != p.template.data["template_version"]:
+            raise StaleVersionError("项目已修改，请重新预测后记录，旧预测不能覆盖当前记录")
+        conditions, predictions, sources = (report.get(k) for k in ("conditions", "predictions", "source_experiments"))
+        if (not isinstance(conditions, list) or not conditions or not isinstance(predictions, list)
+                or not isinstance(sources, list) or len(conditions) != len(predictions) or len(sources) != len(conditions)):
+            raise ValidationError("保存预测需要逐行对应的完整条件、来源实验和模型预测")
+        template = p.template
+        changes, seen = [], set()
+        training_ids = {eid for data in report.get("model_datasets", {}).values() for eid in data.get("experiment_ids", [])}
+        for condition, prediction, source in zip(conditions, predictions, sources):
+            if not isinstance(source, dict): raise ValidationError("预测来源实验格式无效")
+            eid = source.get("experiment_id")
+            if type(eid) is not int or eid <= 0 or eid in seen:
+                raise ValidationError("预测来源实验编号无效或重复")
+            seen.add(eid)
+            old = p.experiment(eid)
+            if "record_uid" not in source or source["record_uid"] != old.get("record_uid"):
+                raise ValidationError(f"实验 {eid} 身份已改变，请重新选择并预测")
+            if template.validate_conditions(condition, execution=False) != old["actual"]:
+                raise ValidationError(f"实验 {eid} 条件已改变，请重新预测实际条件后再记录")
+            if not isinstance(prediction, dict) or not any(isinstance(v, dict) and ("mean" in v or "quantiles" in v) for v in prediction.values()):
+                raise ValidationError(f"实验 {eid} 没有可记录的模型预测")
+            new = copy.deepcopy(old)
+            new.setdefault("record_uid", str(uuid.uuid4()))
+            new.setdefault("performed_at", record_time(old))
+            new["last_prediction"] = make_prediction_snapshot(template.data, condition, prediction,
+                model=report.get("model"), seed=report.get("seed"), revision=report["revision"],
+                source="record_prediction", saved_at=now(), record_uid=new["record_uid"],
+                known_values=known_results(old), training_includes_record=eid in training_ids)
+            self._refresh_prediction_score(new)
+            new["updated"] = now()
+            changes.append((old, new))
+        p.bump()
+        for old, new in changes:
+            eid = new.pop("id")
+            p.db.execute("UPDATE experiments SET payload=? WHERE id=?", (encode(new), eid))
+            p.log("record_prediction", eid, old, new)
+        return [old["id"] for old, _ in changes]
 
     @reversible
     def add_record(self, conditions, observations, **kwargs):
@@ -206,6 +262,7 @@ class PlannerService:
                 new["derived"] = derive(template, new["actual"], new["observations"])
                 new["template_version"] = template.data["template_version"]
                 new["updated"] = now()
+                self._refresh_prediction_score(new, old)
             if plan.changes:
                 p.bump()
                 for old, new in plan.changes:
@@ -268,6 +325,7 @@ class PlannerService:
                     prior = __import__("json").loads(existing[1])
                     for obj in (prior, record):
                         obj.pop("updated", None); obj.pop("record_uid", None); obj.pop("template_version", None)
+                        obj.pop("last_prediction", None); obj.pop("prediction_evaluation", None)
                         if not explicit_date: obj.pop("performed_at", None)
                         obj.setdefault("experiment_batch", "")
                     if prior != record: raise ValidationError("同一外部实验编号内容冲突，请使用更正功能")
@@ -295,6 +353,7 @@ class PlannerService:
         for exp in p.experiments():
             exp["derived"] = derive(template, exp["actual"], exp["observations"])
             exp["template_version"] = template.data["template_version"]
+            self._refresh_prediction_score(exp, template=template)
             recomputed.append(exp)
         with p.transaction(revision):
             p.db.execute("UPDATE project SET template=? WHERE id=1", (encode(template.data),))
@@ -318,6 +377,11 @@ class PlannerService:
             for candidate in saved_batch["candidates"]:
                 record = self.prepare_record(candidate["conditions"], {}, status="pending", suggested=candidate["conditions"])
                 record.update({"batch_id": bid, "experiment_batch": f"推荐批次 {bid}", "prediction": candidate.get("prediction"), "prediction_conditions": copy.deepcopy(candidate["conditions"]), "arrangement": candidate.get("arrangement", "new"), "changes": candidate.get("changes", {})})
+                if candidate.get("prediction"):
+                    record["last_prediction"] = make_prediction_snapshot(p.template.data, candidate["conditions"], candidate["prediction"],
+                        model=saved_batch["request"].get("model"), seed=saved_batch["request"].get("seed"),
+                        revision=batch["revision"], source="recommendation", saved_at=now(), record_uid=record["record_uid"])
+                    self._refresh_prediction_score(record)
                 for name in ("repeat_of","baseline_id","cross_members"):
                     if name in candidate:record[name]=candidate[name]
                 for ref in ("repeat_of", "baseline_id"):

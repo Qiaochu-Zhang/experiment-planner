@@ -65,6 +65,20 @@ def dispatch(args):
         if args.command == "predict":
             from experiment_planner.application.analysis import analyze
             return analyze(project.snapshot(), read_json(args.request))
+        if args.command in ("predict-records", "scores"):
+            ids = [int(value.strip()) for value in args.ids.split(",") if value.strip()] if args.ids else None
+            if args.command == "scores":
+                from experiment_planner.io.score_export import prediction_score_report, export_prediction_scores
+                report = prediction_score_report(project, ids)
+                if args.output: export_prediction_scores(report, args.output)
+                return report
+            from experiment_planner.application.analysis import analyze
+            rows = [project.experiment(eid) for eid in ids] if ids is not None else project.experiments()
+            report = analyze(project.snapshot(), {"conditions": [r["actual"] for r in rows],
+                "source_experiments": [{"experiment_id": r["id"], "record_uid": r.get("record_uid")} for r in rows],
+                "model": args.model, "seed": args.seed})
+            if args.commit: report["recorded_ids"] = service.save_record_predictions(report)
+            return report
         if args.command == "importance":
             from experiment_planner.application.importance import analyze_importance
             report = analyze_importance(project.snapshot(), {"model": args.model, "seed": args.seed})
@@ -84,7 +98,7 @@ def main(argv=None):
     create.add_argument("--template", type=Path)
     builtin = sub.add_parser("builtin-template", help="导出内置模板，供编辑和复制")
     builtin.add_argument("output", type=Path)
-    for name in ("records", "history", "template", "record", "import", "export", "backup", "recommend", "predict", "importance"):
+    for name in ("records", "history", "template", "record", "import", "export", "backup", "recommend", "predict", "importance", "predict-records", "scores"):
         command = sub.add_parser(name)
         command.add_argument("project", type=Path)
         if name == "template":
@@ -96,16 +110,19 @@ def main(argv=None):
         if name == "import":
             command.add_argument("--mapping", type=Path, help="原始表头到模板字段名的 JSON 映射")
             command.add_argument("--update", action="store_true", help="将本项目导出的记录作为批量更正；校验身份与导出版本")
-        if name in ("import", "recommend"):
+        if name in ("import", "recommend", "predict-records"):
             command.add_argument("--commit", action="store_true", help="把预览结果保存到项目")
         if name in ("export", "backup"):
             command.add_argument("output", type=Path)
         if name in ("recommend", "predict"):
             command.add_argument("request", type=Path)
-        if name == "importance":
+        if name in ("importance", "predict-records"):
             command.add_argument("--model", default="gp_rbf_v1", choices=("gp_rbf_v1", "gp_matern25_v1", "bayesian_linear_v1"))
             command.add_argument("--seed", default=0, type=int)
-            command.add_argument("--output", type=Path, help="可选导出重要度 XLSX / CSV")
+        if name in ("importance", "scores"):
+            command.add_argument("--output", type=Path, help="可选导出 XLSX / CSV")
+        if name in ("predict-records", "scores"):
+            command.add_argument("--ids", help="逗号分隔的实验编号；省略时为全部实验")
     args = parser.parse_args(argv)
     try:
         print(json.dumps(dispatch(args), ensure_ascii=False, indent=2, allow_nan=False))

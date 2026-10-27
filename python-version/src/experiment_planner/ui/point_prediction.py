@@ -17,6 +17,7 @@ class PointPredictionPanel(QWidget):
     cancel_requested = Signal()
     export_requested = Signal()
     details_requested = Signal()
+    record_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -27,7 +28,7 @@ class PointPredictionPanel(QWidget):
         self.busy = False
         layout = QVBoxLayout(self)
         hint = QLabel("在“实验记录”中按 Ctrl 多选或 Shift 连选，再复制到这里。使用“下一批实验”所选模型和随机种子，"
-                      "一次拟合并预测全部实验点；本页只预测，不绘图。条件按复制时原值保留，不修改实验记录。")
+                      "一次拟合并预测全部实验点；本页不绘图。计算本身不修改实验记录，可点击“记录到原实验”保存为回填评分的依据。")
         hint.setWordWrap(True)
         layout.addWidget(hint)
         self.model_hint = QLabel()
@@ -65,6 +66,9 @@ class PointPredictionPanel(QWidget):
         self.export_button = QPushButton("导出批量预测 Excel")
         self.export_button.clicked.connect(lambda:self.export_requested.emit())
         row.addWidget(self.export_button)
+        self.record_button = QPushButton("记录到原实验（用于回填评分）")
+        self.record_button.clicked.connect(lambda:self.record_requested.emit())
+        row.addWidget(self.record_button)
         self.output = QPlainTextEdit()
         self.output.setReadOnly(True)
         self.output.setMinimumHeight(120)
@@ -86,7 +90,7 @@ class PointPredictionPanel(QWidget):
         self.points = deepcopy(points)
         self.reset_result()
         self.output.setPlainText(f"已复制 {len(points)} 个实验点的完整条件。点击“按所选模型批量预测”计算。"
-                                 "再次复制会替换当前列表；关闭或切换项目会清空，请及时导出结果。")
+                                 "再次复制会替换当前列表；关闭或切换项目会清空本页，可在计算后记录到原实验以保留逐条预测。")
 
     def clear_points(self):
         self.points = []
@@ -162,6 +166,7 @@ class PointPredictionPanel(QWidget):
         self.cancel_button.setEnabled(self.busy)
         self.export_button.setEnabled(self.report is not None and not self.busy)
         self.details_button.setEnabled(self.report is not None)
+        self.record_button.setEnabled(self.report is not None and not self.busy)
 
     def display_report(self, report, template, current_revision):
         rows, _ = point_prediction_tables(report, template)
@@ -179,7 +184,7 @@ class PointPredictionPanel(QWidget):
         message = (f"已完成 {len(report['conditions'])} 个实验点的批量预测；模型：{report['model']}，"
                    f"数据版本：{report['revision']}，模板版本：{report['template_version']}。\n"
                    "表中列出预测均值、中位数与中央 95% 区间；区间未额外叠加未来测量噪声。\n"
-                   "所选历史实验仍参与训练，这些是模型预测，不是独立留出验证。结果仅在当前窗口保留，请及时导出 Excel。")
+                   "所选历史实验仍参与训练，这些是模型预测，不是独立留出验证。本页结果可导出 Excel，或记录到原实验后随项目保留逐条预测。")
         if report["revision"] != current_revision:
             message = "项目已更改：以下结果属于旧数据版本；导出仍保留原预测快照，需要最新结果请重新计算。\n" + message
         notices = report.get("notices", [])
